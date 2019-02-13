@@ -69,7 +69,7 @@ module.exports = function zelda(opts){
   if(!opts) opts = {};
 
   // Use folder with nearest package.json as root
-  var rootPath = findRoot();
+  var rootPath = findRoot(process.cwd());
 
   var rootName = require(path.join(rootPath, 'package.json')).name;
   var codePath = path.resolve(rootPath, '..');
