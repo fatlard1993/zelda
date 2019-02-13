@@ -1,26 +1,15 @@
-# zelda [![travis][travis-image]][travis-url] [![npm][npm-image]][npm-url] [![downloads][downloads-image]][downloads-url] [![javascript style guide][standard-image]][standard-url]
+## Automatically `npm link` all your packages together!
 
-[travis-image]: https://img.shields.io/travis/feross/zelda/master.svg
-[travis-url]: https://travis-ci.org/feross/zelda
-[npm-image]: https://img.shields.io/npm/v/zelda.svg
-[npm-url]: https://npmjs.org/package/zelda
-[downloads-image]: https://img.shields.io/npm/dm/zelda.svg
-[downloads-url]: https://npmjs.org/package/zelda
-[standard-image]: https://img.shields.io/badge/code_style-standard-brightgreen.svg
-[standard-url]: https://standardjs.com
-
-#### Automatically `npm link` all your packages together!
-
-![link spin attack](https://raw.githubusercontent.com/feross/zelda/master/img/link-attack.jpg)
+![link spin attack](./img/link-attack.jpg)
 
 Sometimes Link needs a little help from Zelda.
 
-### usage
+### Usage
 
 1. Install it globally.
 
   ```bash
-  npm install -g zelda
+  npm install -g fatlard1993/zelda
   ```
 
 2. Run `zelda` from your node project directory. For example:
@@ -38,7 +27,7 @@ Zelda assumes that all your code lives in the directory one level up from the
 folder where you run `zelda`. So, keep all your packages in a single folder like
 `~/code` and run `zelda` inside one of the projects (ex: `~/code/my-project`).
 
-### what you might do if you're clever
+### Example
 
 1. Clone a cool project.
 
@@ -65,16 +54,12 @@ folder where you run `zelda`. So, keep all your packages in a single folder like
 
 Gone are the days of running tons of `npm link` commands by hand!
 
-### features
+### Features
 
 - Automatically `npm link` all your modules together
 - Supports `dependencies`, `devDependencies`, and `optionalDependencies`
 - Recursively runs `npm install` so your freshly cloned projects are ready to go!
 
-### link is better with zelda!
+### Link is better with Zelda!
 
-![link](https://raw.githubusercontent.com/feross/zelda/master/img/link-zelda.png)
-
-### license
-
-MIT. Copyright [Feross Aboukhadijeh](https://www.twitter.com/feross).
+![link](./img/link-zelda.png)

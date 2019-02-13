@@ -1,44 +1,28 @@
 {
   "name": "zelda",
-  "description": "Automatically `npm link` all your packages together!",
-  "version": "3.4.0",
-  "author": {
-    "name": "Feross Aboukhadijeh",
-    "email": "feross@feross.org",
-    "url": "http://feross.org/"
-  },
-  "bin": "./bin/cmd.js",
-  "bugs": {
-    "url": "https://github.com/feross/zelda/issues"
-  },
+  "version": "1.0.0",
+  "description": "![link spin attack](./img/link-attack.jpg)",
+  "main": "src/index.js",
   "dependencies": {
-    "find-root": "~1.1.0",
-    "minimist": "^1.1.0",
-    "rimraf": "^2.2.8",
-    "run-parallel": "^1.1.4",
-    "run-series": "^1.1.4",
-    "uniq": "^1.0.1"
+    "find-root": "^1.1.0",
+    "minimist": "^1.2.0",
+    "rimraf": "^2.6.3"
   },
   "devDependencies": {
-    "standard": "*"
-  },
-  "homepage": "https://github.com/feross/zelda/",
-  "keywords": [
-    "all",
-    "automatic",
-    "mad science",
-    "npm link",
-    "npm link everything",
-    "recursive",
-    "zelda"
-  ],
-  "license": "MIT",
-  "main": "index.js",
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/feross/zelda.git"
+    "babel-eslint": "^10.0.1",
+    "eslint": "^5.13.0"
   },
   "scripts": {
-    "test": "standard"
-  }
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatlard1993/zelda.git"
+  },
+  "author": "feross, fatlard1993",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fatlard1993/zelda/issues"
+  },
+  "homepage": "https://github.com/fatlard1993/zelda#readme"
 }
