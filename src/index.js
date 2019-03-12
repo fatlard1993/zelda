@@ -8,6 +8,8 @@ const argv = minimist(process.argv.slice(2), {
 	alias: {
 		i: 'install',
 		s: 'simulate',
+		p: 'parentFolder',
+		f: 'folder',
 		h: 'help',
 		v: 'version'
 	},
@@ -23,10 +25,12 @@ if(argv.version) console.log(require('../package.json').version);
 
 else if(argv.help){
 	var help = 'Usage: zelda [OPTIONS]';
-	help += '\n -i, --install     force run `npm install` on each package';
-	help += '\n -s, --simulate    see what would happen, without making any changes';
-	help += '\n -h, --help        show help (this)';
-	help += '\n -v, --version     show version';
+	help += '\n -i, --install       force run `npm install` on each package';
+	help += '\n -s, --simulate      see what would happen, without making any changes';
+	help += '\n -p, --parentFolder  the top level folder containing all your code';
+	help += '\n -f, --folder        add an additional folder to source modules';
+	help += '\n -h, --help          show help (this)';
+	help += '\n -v, --version       show version';
 
 	console.log(help);
 }

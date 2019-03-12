@@ -5,22 +5,26 @@ const childProcess = require('child_process');
 const findRoot = require('find-root');
 const rimraf = require('rimraf');
 
-function getPackages(packageFolder){
-	try{
-		const packages = {};
+const localPackageFolders = {};
 
-		fs.readdirSync(packageFolder).forEach((entry) => {
-			const pkgPath = path.join(packageFolder, entry);
+function getLocalPackageFolder(parentFolders, packageName){
+	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
 
-			try{ packages[require(path.join(pkgPath, 'package.json')).name] = pkgPath; }
+	let localPackageFolder;
 
-			catch(err){ return; }
-		});
+	parentFolders.forEach((folder) => {
+		folder = path.join(folder, packageName);
 
-		return packages;
+		if(fs.existsSync(folder)) localPackageFolder = folder;
+	});
+
+	if(localPackageFolder){
+		console.log('[zelda] Found local package - ', localPackageFolder);
+
+		localPackageFolders[packageName] = localPackageFolder;
 	}
 
-	catch(err){ throw new Error(`Could not find ${packageFolder} | ${err.message}`); }
+	return localPackageFolder;
 }
 
 function traverseNodeModules(pkgPath, cb){
@@ -59,6 +63,9 @@ function npmInstall(packageFolder, simulate){
 module.exports = function zelda(opts = {}){
 	const rootPackageFolder = findRoot(process.cwd());
 	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
+	let localPackageFolders = [parentFolder];
+
+	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
 	rmDir(path.join(parentFolder, 'node_modules'));
 
@@ -66,24 +73,26 @@ module.exports = function zelda(opts = {}){
 
 	if(!opts.simulate) fs.mkdirSync(path.join(parentFolder, 'node_modules'));
 
-	const codePackages = getPackages(parentFolder);
-
 	if(opts.install) npmInstall(rootPackageFolder, opts.simulate);
 
 	const packagesToPurge = {};
 
 	traverseNodeModules(rootPackageFolder, (packageName) => {
-		if(!codePackages[packageName] || packagesToPurge[packageName]) return;
+		if(packagesToPurge[packageName]) return;
+
+		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageName);
+
+		if(!localPackageFolder) return;
 
 		packagesToPurge[packageName] = true;
 
-		if(opts.install) npmInstall(path.join(parentFolder, packageName), opts.simulate);
+		if(opts.install) npmInstall(localPackageFolder, opts.simulate);
 
 		rmDir(path.join(rootPackageFolder, 'node_modules', packageName), opts.simulate);
 	});
 
 	Object.keys(packagesToPurge).forEach((packageToPurge) => {
-		const localPackageFolder = path.join(parentFolder, packageToPurge);
+		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageToPurge);
 
 		console.log(`[zelda] cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
 
