@@ -31,9 +31,9 @@ function traverseNodeModules(pkgPath, cb){
 		entries.forEach((entry) => {
 			const entryPath = path.join(modulesPath, entry);
 
-			traverseNodeModules(entryPath, cb);
-
 			cb(entry, entryPath);
+
+			traverseNodeModules(entryPath, cb);
 		});
 	}
 
@@ -47,7 +47,7 @@ function rmDir(dirPath, simulate){
 }
 
 function npmInstall(packageFolder, simulate){
-	console.log(`[zelda] cd ${packageFolder} && rm node_modules/ && npm i`);
+	console.log(`[zelda] cd ${packageFolder} && rm -rf node_modules/ && npm i`);
 
 	if(simulate) return;
 
@@ -62,9 +62,9 @@ module.exports = function zelda(opts = {}){
 
 	rmDir(path.join(parentFolder, 'node_modules'));
 
-	console.log(`[zelda] cd ${parentFolder} && ln -s . node_modules`);
+	console.log(`[zelda] cd ${parentFolder} && mkdir node_modules`);
 
-	if(!opts.simulate) fs.symlinkSync('.', path.join(parentFolder, 'node_modules'), 'dir');
+	if(!opts.simulate) fs.mkdirSync(path.join(parentFolder, 'node_modules'));
 
 	const codePackages = getPackages(parentFolder);
 
@@ -80,14 +80,16 @@ module.exports = function zelda(opts = {}){
 		if(opts.install) npmInstall(path.join(parentFolder, packageName), opts.simulate);
 
 		rmDir(path.join(rootPackageFolder, 'node_modules', packageName), opts.simulate);
-
-		console.log(`[zelda] cd ${parentFolder} && ln -s . node_modules`);
-
-		if(!opts.simulate) fs.symlinkSync('.', path.join(parentFolder, 'node_modules'), 'dir');
 	});
 
 	Object.keys(packagesToPurge).forEach((packageToPurge) => {
-		traverseNodeModules(path.join(parentFolder, packageToPurge), (packageName, packageFolder) => {
+		const localPackageFolder = path.join(parentFolder, packageToPurge);
+
+		console.log(`[zelda] cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
+
+		if(!opts.simulate) fs.symlinkSync(localPackageFolder, path.join(parentFolder, 'node_modules', packageToPurge), 'dir');
+
+		traverseNodeModules(localPackageFolder, (packageName, packageFolder) => {
 			if(packagesToPurge[packageName]) rmDir(packageFolder, opts.simulate);
 		});
 	});
