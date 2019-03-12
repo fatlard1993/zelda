@@ -10,77 +10,77 @@ const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 function getCodePackages(codePath){
 	var entries;
 
-  try{
-    entries = fs.readdirSync(codePath);
+	try{
+		entries = fs.readdirSync(codePath);
 	}
 
 	catch(err){
-    throw new Error(`Could not find ${codePath} | ${err.message}`);
-  }
+		throw new Error(`Could not find ${codePath} | ${err.message}`);
+	}
 
-  var packages = {};
+	var packages = {};
 
-  entries.forEach(function(entry){
-    var pkgPath = path.join(codePath, entry);
+	entries.forEach(function(entry){
+		var pkgPath = path.join(codePath, entry);
 		var pkg;
 
-    try{
-      pkg = require(path.join(pkgPath, 'package.json'));
+		try{
+			pkg = require(path.join(pkgPath, 'package.json'));
 		}
 
 		catch(err){
-      return; // ignore folders without package.json
+			return; // ignore folders without package.json
 		}
 
-    packages[pkg.name] = pkgPath;
-  });
+		packages[pkg.name] = pkgPath;
+	});
 
-  return packages;
+	return packages;
 }
 
 function traverseNodeModules(pkgPath, cb){
-  var modulesPath = path.join(pkgPath, 'node_modules');
+	var modulesPath = path.join(pkgPath, 'node_modules');
 	var entries;
 
 	try{
-    entries = fs.readdirSync(modulesPath);
+		entries = fs.readdirSync(modulesPath);
 	}
 
 	catch(err){
-    return; // no node_modules
-  }
+		return; // no node_modules
+	}
 
-  entries = entries.filter(function(entry){
+	entries = entries.filter(function(entry){
 		var stat = fs.lstatSync(path.join(modulesPath, entry));
 
-    return !stat.isSymbolicLink();
-  });
+		return !stat.isSymbolicLink();
+	});
 
-  entries.forEach(function(entry){
+	entries.forEach(function(entry){
 		var entryPath = path.join(modulesPath, entry);
 
 		traverseNodeModules(entryPath, cb);
 
-    cb(entry, entryPath);
-  });
+		cb(entry, entryPath);
+	});
 }
 
 module.exports = function zelda(opts){
-  if(!opts) opts = {};
+	if(!opts) opts = {};
 
-  // Use folder with nearest package.json as root
-  var rootPath = findRoot(process.cwd());
+	// Use folder with nearest package.json as root
+	var rootPath = findRoot(process.cwd());
 
-  var rootName = require(path.join(rootPath, 'package.json')).name;
-  var codePath = path.resolve(rootPath, '..');
+	var rootName = require(path.join(rootPath, 'package.json')).name;
+	var codePath = path.resolve(rootPath, '..');
 
-  if(!rootName) throw new Error('Root package must have a name');
+	if(!rootName) throw new Error('Root package must have a name');
 
-  // add node_modules symlink in code folder - MAGIC
-  try{
+	// add node_modules symlink in code folder - MAGIC
+	try{
 		console.log(`[zelda] cd ${codePath} && rm -rf ./node_modules && ln -s . node_modules`);
 
-    if(!opts.simulate){
+		if(!opts.simulate){
 			rimraf.sync(path.join(codePath, 'node_modules'));
 
 			fs.symlinkSync('.', path.join(codePath, 'node_modules'), 'dir');
@@ -88,51 +88,51 @@ module.exports = function zelda(opts){
 	}
 
 	catch(err){
-    // ignore err (symlink already exists)
-  }
+		// ignore err (symlink already exists)
+	}
 
-  var codePackages = getCodePackages(codePath);
+	var codePackages = getCodePackages(codePath);
 
-  if(opts.install) npmInstall(rootPath);
+	if(opts.install) npmInstall(rootPath);
 
 	var packagesToPurge = {};
 
-  packagesToPurge[rootName] = true;
+	packagesToPurge[rootName] = true;
 
-  traverseNodeModules(rootPath, function(packageName){
+	traverseNodeModules(rootPath, function(packageName){
 		if(!codePackages[packageName]) return;
 
 		packagesToPurge[packageName] = true;
 
 		if(opts.install) npmInstall(path.join(codePath, packageName));
-  });
+	});
 
-  traverseNodeModules(rootPath, function(packageName, packagePath){
-    if(packagesToPurge[packageName]) rmDir(packagePath);
-  });
+	traverseNodeModules(rootPath, function(packageName, packagePath){
+		if(packagesToPurge[packageName]) rmDir(packagePath);
+	});
 
-  Object.keys(packagesToPurge).forEach(function(packageToPurge){
-    if(packageToPurge === rootName) return;
+	Object.keys(packagesToPurge).forEach(function(packageToPurge){
+		if(packageToPurge === rootName) return;
 
 		var packagePath = path.join(codePath, packageToPurge);
 
-    traverseNodeModules(packagePath, function(packageName, packagePath){
-      if(packagesToPurge[packageName]) rmDir(packagePath);
-    });
-  });
+		traverseNodeModules(packagePath, function(packageName, packagePath){
+			if(packagesToPurge[packageName]) rmDir(packagePath);
+		});
+	});
 
-  function rmDir(dirPath){
+	function rmDir(dirPath){
 		console.log(`[zelda] rm -rf ${dirPath}`);
 
-    if(!opts.simulate) rimraf.sync(dirPath);
-  }
+		if(!opts.simulate) rimraf.sync(dirPath);
+	}
 
-  function npmInstall(packagePath){
+	function npmInstall(packagePath){
 		console.log(`[zelda] cd ${packagePath} && rm node_modules/ && npm i`);
 
 		var args = ['i'];
 
-    if(opts.production) args.push('--production');
+		if(opts.production) args.push('--production');
 
 		if(opts.simulate) return;
 
@@ -142,5 +142,5 @@ module.exports = function zelda(opts){
 			cwd: packagePath,
 			stdio: 'inherit'
 		});
-  }
+	}
 };
