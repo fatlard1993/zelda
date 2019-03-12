@@ -5,10 +5,8 @@ const childProcess = require('child_process');
 const findRoot = require('find-root');
 const rimraf = require('rimraf');
 
-const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
 function getCodePackages(codePath){
-	var entries;
+	let entries;
 
 	try{
 		entries = fs.readdirSync(codePath);
@@ -18,29 +16,28 @@ function getCodePackages(codePath){
 		throw new Error(`Could not find ${codePath} | ${err.message}`);
 	}
 
-	var packages = {};
+	const packages = {};
 
 	entries.forEach(function(entry){
-		var pkgPath = path.join(codePath, entry);
-		var pkg;
+		const pkgPath = path.join(codePath, entry);
 
 		try{
-			pkg = require(path.join(pkgPath, 'package.json'));
+			const pkg = require(path.join(pkgPath, 'package.json'));
+
+			packages[pkg.name] = pkgPath;
 		}
 
 		catch(err){
 			return; // ignore folders without package.json
 		}
-
-		packages[pkg.name] = pkgPath;
 	});
 
 	return packages;
 }
 
 function traverseNodeModules(pkgPath, cb){
-	var modulesPath = path.join(pkgPath, 'node_modules');
-	var entries;
+	const modulesPath = path.join(pkgPath, 'node_modules');
+	let entries;
 
 	try{
 		entries = fs.readdirSync(modulesPath);
@@ -51,13 +48,13 @@ function traverseNodeModules(pkgPath, cb){
 	}
 
 	entries = entries.filter(function(entry){
-		var stat = fs.lstatSync(path.join(modulesPath, entry));
+		const stat = fs.lstatSync(path.join(modulesPath, entry));
 
 		return !stat.isSymbolicLink();
 	});
 
 	entries.forEach(function(entry){
-		var entryPath = path.join(modulesPath, entry);
+		const entryPath = path.join(modulesPath, entry);
 
 		traverseNodeModules(entryPath, cb);
 
@@ -65,82 +62,63 @@ function traverseNodeModules(pkgPath, cb){
 	});
 }
 
+function rmDir(dirPath, simulate){
+	console.log(`[zelda] rm -rf ${dirPath}`);
+
+	if(!simulate) rimraf.sync(dirPath);
+}
+
+function npmInstall(packagePath, simulate){
+	console.log(`[zelda] cd ${packagePath} && rm node_modules/ && npm i`);
+
+	if(simulate) return;
+
+	rimraf.sync(path.join(packagePath, 'node_modules'));
+
+	childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i'], { cwd: packagePath, stdio: 'inherit' });
+}
+
 module.exports = function zelda(opts){
 	if(!opts) opts = {};
 
 	// Use folder with nearest package.json as root
-	var rootPath = findRoot(process.cwd());
+	const rootPath = findRoot(process.cwd());
 
-	var rootName = require(path.join(rootPath, 'package.json')).name;
-	var codePath = path.resolve(rootPath, '..');
+	const rootName = require(path.join(rootPath, 'package.json')).name;
+	const codePath = path.resolve(rootPath, '..');
 
-	if(!rootName) throw new Error('Root package must have a name');
+	if(!rootName) throw new Error('[zelda] Root package must have a name');
+
+	rmDir(path.join(codePath, 'node_modules'));
 
 	// add node_modules symlink in code folder - MAGIC
-	try{
-		console.log(`[zelda] cd ${codePath} && rm -rf ./node_modules && ln -s . node_modules`);
+	console.log(`[zelda] cd ${codePath} && ln -s . node_modules`);
 
-		if(!opts.simulate){
-			rimraf.sync(path.join(codePath, 'node_modules'));
+	if(!opts.simulate) fs.symlinkSync('.', path.join(codePath, 'node_modules'), 'dir');
 
-			fs.symlinkSync('.', path.join(codePath, 'node_modules'), 'dir');
-		}
-	}
+	const codePackages = getCodePackages(codePath);
 
-	catch(err){
-		// ignore err (symlink already exists)
-	}
+	if(opts.install) npmInstall(rootPath, opts.simulate);
 
-	var codePackages = getCodePackages(codePath);
+	const packagesToPurge = { [rootName]: true };
 
-	if(opts.install) npmInstall(rootPath);
-
-	var packagesToPurge = {};
-
-	packagesToPurge[rootName] = true;
-
-	traverseNodeModules(rootPath, function(packageName){
+	traverseNodeModules(rootPath, function(packageName, packagePath){
 		if(!codePackages[packageName]) return;
 
 		packagesToPurge[packageName] = true;
 
-		if(opts.install) npmInstall(path.join(codePath, packageName));
-	});
+		if(opts.install) npmInstall(path.join(codePath, packageName), opts.simulate);
 
-	traverseNodeModules(rootPath, function(packageName, packagePath){
-		if(packagesToPurge[packageName]) rmDir(packagePath);
+		if(packagesToPurge[packageName]) rmDir(packagePath, opts.simulate);
 	});
 
 	Object.keys(packagesToPurge).forEach(function(packageToPurge){
 		if(packageToPurge === rootName) return;
 
-		var packagePath = path.join(codePath, packageToPurge);
+		const packagePath = path.join(codePath, packageToPurge);
 
 		traverseNodeModules(packagePath, function(packageName, packagePath){
-			if(packagesToPurge[packageName]) rmDir(packagePath);
+			if(packagesToPurge[packageName]) rmDir(packagePath, opts.simulate);
 		});
 	});
-
-	function rmDir(dirPath){
-		console.log(`[zelda] rm -rf ${dirPath}`);
-
-		if(!opts.simulate) rimraf.sync(dirPath);
-	}
-
-	function npmInstall(packagePath){
-		console.log(`[zelda] cd ${packagePath} && rm node_modules/ && npm i`);
-
-		var args = ['i'];
-
-		if(opts.production) args.push('--production');
-
-		if(opts.simulate) return;
-
-		rimraf.sync(path.join(packagePath, 'node_modules'));
-
-		childProcess.spawnSync(npmCmd, args, {
-			cwd: packagePath,
-			stdio: 'inherit'
-		});
-	}
 };
