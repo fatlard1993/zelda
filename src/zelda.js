@@ -4,8 +4,13 @@ const childProcess = require('child_process');
 
 const findRoot = require('find-root');
 const rimraf = require('rimraf');
+const now = require('performance-now');
 
 const localPackageFolders = {};
+
+function log(msg){
+	console.log(`[zelda] ${msg}`);
+}
 
 function getLocalPackageFolder(parentFolders, packageName){
 	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
@@ -18,62 +23,98 @@ function getLocalPackageFolder(parentFolders, packageName){
 		if(fs.existsSync(folder)) localPackageFolder = folder;
 	});
 
-	if(localPackageFolder){
-		console.log('[zelda] Found local package - ', localPackageFolder);
-
-		localPackageFolders[packageName] = localPackageFolder;
-	}
+	if(localPackageFolder) localPackageFolders[packageName] = localPackageFolder;
 
 	return localPackageFolder;
 }
 
+function getChildFolders(folder){
+	return fs.readdirSync(folder).filter((entry) => {
+		const stats = fs.lstatSync(path.join(folder, entry));
+
+		return stats.isDirectory() && !stats.isSymbolicLink();
+	});
+}
+
 function traverseNodeModules(pkgPath, cb){
-	try{
-		const modulesPath = path.join(pkgPath, 'node_modules');
-		const entries = fs.readdirSync(modulesPath).filter((entry) => { return !fs.lstatSync(path.join(modulesPath, entry)).isSymbolicLink(); });
+	const modulesPath = path.join(pkgPath, 'node_modules');
 
-		entries.forEach((entry) => {
-			const entryPath = path.join(modulesPath, entry);
+	if(!fs.existsSync(modulesPath)) return;
 
-			cb(entry, entryPath);
+	const entries = getChildFolders(modulesPath);
 
-			traverseNodeModules(entryPath, cb);
-		});
+	entries.forEach((entry) => {
+		const entryPath = path.join(modulesPath, entry);
+
+		cb(entry, entryPath);
+
+		traverseNodeModules(entryPath, cb);
+	});
+}
+
+function findLocalPackageFolders(parentFolder){
+	const folders = getChildFolders(parentFolder);
+	const localPackageFolders = [];
+
+	for(var x = 0, count = folders.length, folder, folderChildren; x < count; ++x){
+		folder = path.join(parentFolder, folders[x]);
+		folderChildren = getChildFolders(folder);
+
+		for(var y = 0, yCount = folderChildren.length, folderGrandchild; y < yCount; ++y){
+			folderGrandchild = path.join(parentFolder, folderChildren[y]);
+
+			if(fs.existsSync(path.join(folderGrandchild, 'package.json'))){
+				localPackageFolders.push(folder);
+
+				break;
+			}
+		}
 	}
 
-	catch(err){ return; }
+	log(`Found ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
+
+	return localPackageFolders;
 }
 
-function rmDir(dirPath, simulate){
-	console.log(`[zelda] rm -rf ${dirPath}`);
+function rmDir(folder, opts){
+	if(!fs.existsSync(folder)) return;
 
-	if(!simulate) rimraf.sync(dirPath);
+	if(opts.simulate) return log(`rm -rf ${folder}`);
+
+	rimraf.sync(folder);
 }
 
-function npmInstall(packageFolder, simulate){
-	console.log(`[zelda] cd ${packageFolder} && rm -rf node_modules/ && npm i`);
+function npmInstall(packageFolder, opts){
+	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
+		log(`${packageFolder} has no node_modules ... Must install to continue`);
 
-	if(simulate) return;
+		opts.simulate = false;
+	}
 
-	rimraf.sync(path.join(packageFolder, 'node_modules'));
+	else if(!opts.install) return;
 
-	childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i'], { cwd: packageFolder, stdio: 'inherit' });
+	rmDir(path.join(packageFolder, 'node_modules'));
+
+	if(opts.simulate) log(`cd ${packageFolder} && npm i`);
+	else childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
 }
 
 module.exports = function zelda(opts = {}){
+	const start = now();
 	const rootPackageFolder = findRoot(process.cwd());
 	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
 	let localPackageFolders = [parentFolder];
 
+	if(opts.autoFolders) localPackageFolders = localPackageFolders.concat(findLocalPackageFolders(parentFolder));
+
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
-	rmDir(path.join(parentFolder, 'node_modules'));
+	rmDir(path.join(parentFolder, 'node_modules'), opts);
 
-	console.log(`[zelda] cd ${parentFolder} && mkdir node_modules`);
+	if(opts.simulate) log(`mkdir ${parentFolder}/node_modules`);
+	else fs.mkdirSync(path.join(parentFolder, 'node_modules'));
 
-	if(!opts.simulate) fs.mkdirSync(path.join(parentFolder, 'node_modules'));
-
-	if(opts.install) npmInstall(rootPackageFolder, opts.simulate);
+	npmInstall(rootPackageFolder, opts);
 
 	const packagesToPurge = {};
 
@@ -86,20 +127,23 @@ module.exports = function zelda(opts = {}){
 
 		packagesToPurge[packageName] = true;
 
-		if(opts.install) npmInstall(localPackageFolder, opts.simulate);
+		npmInstall(localPackageFolder, opts);
 
-		rmDir(path.join(rootPackageFolder, 'node_modules', packageName), opts.simulate);
+		rmDir(path.join(rootPackageFolder, 'node_modules', packageName), opts);
 	});
 
-	Object.keys(packagesToPurge).forEach((packageToPurge) => {
+	const packageNamesToPurge = Object.keys(packagesToPurge), packagesToPurgeCount = packageNamesToPurge.length;
+
+	packageNamesToPurge.forEach((packageToPurge) => {
 		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageToPurge);
 
-		console.log(`[zelda] cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
-
-		if(!opts.simulate) fs.symlinkSync(localPackageFolder, path.join(parentFolder, 'node_modules', packageToPurge), 'dir');
+		if(opts.simulate) log(`cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
+		else fs.symlinkSync(localPackageFolder, path.join(parentFolder, 'node_modules', packageToPurge), 'dir');
 
 		traverseNodeModules(localPackageFolder, (packageName, packageFolder) => {
-			if(packagesToPurge[packageName]) rmDir(packageFolder, opts.simulate);
+			if(packagesToPurge[packageName]) rmDir(packageFolder, opts);
 		});
 	});
+
+	if(packagesToPurgeCount) log(`${opts.simulate ? 'SIMULATED' : ''} Setup links for ${packagesToPurgeCount} local packages in ${(now() - start) / 1000}s. Packages: ${packageNamesToPurge.join(', ')}`);
 };

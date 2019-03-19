@@ -1,38 +1,29 @@
 #!/usr/bin/env node
 
-const minimist = require('minimist');
+const yargs = require('yargs');
 
 const zelda = require('./zelda');
 
-const argv = minimist(process.argv.slice(2), {
-	alias: {
-		i: 'install',
-		s: 'simulate',
-		p: 'parentFolder',
-		f: 'folder',
-		h: 'help',
-		v: 'version'
-	},
-	boolean: [
-		'install',
-		'simulate',
-		'help',
-		'version'
-	]
+yargs.alias({
+	h: 'help',
+	v: 'version',
+	i: 'install',
+	s: 'simulate',
+	a: 'autoFolders',
+	p: 'parentFolder',
+	f: 'folder'
 });
 
-if(argv.version) console.log(require('../package.json').version);
+yargs.boolean(['i', 's', 'a']);
 
-else if(argv.help){
-	var help = 'Usage: zelda [OPTIONS]';
-	help += '\n -i, --install       force run `npm install` on each package';
-	help += '\n -s, --simulate      see what would happen, without making any changes';
-	help += '\n -p, --parentFolder  the top level folder containing all your code';
-	help += '\n -f, --folder        add an additional folder to source modules';
-	help += '\n -h, --help          show help (this)';
-	help += '\n -v, --version       show version';
+yargs.describe({
+	i: 'Force run `npm install` on each package',
+	s: 'See what would happen, without making changes',
+	a: 'Automatically detect folders to source modules',
+	p: 'The top level folder containing all your code',
+	f: 'Add an additional folder to source modules'
+});
 
-	console.log(help);
-}
+const args = yargs.argv;
 
-else zelda(argv);
+zelda(args);
