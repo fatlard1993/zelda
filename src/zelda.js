@@ -93,7 +93,7 @@ function npmInstall(packageFolder, opts){
 
 	else if(!opts.install) return;
 
-	rmDir(path.join(packageFolder, 'node_modules'));
+	rmDir(path.join(packageFolder, 'node_modules'), opts);
 
 	if(opts.simulate) log(`cd ${packageFolder} && npm i`);
 	else childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
