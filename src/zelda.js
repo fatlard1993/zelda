@@ -103,16 +103,19 @@ module.exports = function zelda(opts = {}){
 	const start = now();
 	const rootPackageFolder = findRoot(process.cwd());
 	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
+	const parentModulesFolder = path.join(parentFolder, 'node_modules');
 	let localPackageFolders = [parentFolder];
 
 	if(opts.autoFolders) localPackageFolders = localPackageFolders.concat(findLocalPackageFolders(parentFolder));
 
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
-	rmDir(path.join(parentFolder, 'node_modules'), opts);
+	if(fs.existsSync(parentModulesFolder) && opts.clean) rmDir(parentModulesFolder, opts);
 
-	if(opts.simulate) log(`mkdir ${parentFolder}/node_modules`);
-	else fs.mkdirSync(path.join(parentFolder, 'node_modules'));
+	if(!fs.existsSync(parentModulesFolder)){
+		if(opts.simulate) log(`mkdir ${parentFolder}/node_modules`);
+		else fs.mkdirSync(parentModulesFolder);
+	}
 
 	npmInstall(rootPackageFolder, opts);
 
