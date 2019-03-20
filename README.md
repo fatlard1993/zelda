@@ -2,15 +2,12 @@
 
 ![zelda](./img/zelda.jpg)
 
-
-## Automatically `npm link` all your packages together!
-
 Sometimes Link needs a little help from Zelda.
 
 
 ### Features
 
-- Automatically `npm link` all your modules together
+- Automatically `npm link` all your packages together
 - Recursively runs `npm install` so your freshly cloned projects are ready to go!
 
 
