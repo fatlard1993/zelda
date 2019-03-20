@@ -1,8 +1,9 @@
 # Zelda
 
-## Automatically `npm link` all your packages together!
-
 ![zelda](./img/zelda.jpg)
+
+
+## Automatically `npm link` all your packages together!
 
 Sometimes Link needs a little help from Zelda.
 
