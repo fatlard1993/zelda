@@ -144,9 +144,10 @@ module.exports = function zelda(opts = {}){
 
 	packageNamesToPurge.forEach((packageToPurge) => {
 		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageToPurge);
+		const localPackage = path.join(parentFolder, 'node_modules', packageToPurge);
 
 		if(opts.simulate) log(`cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
-		else fs.symlinkSync(localPackageFolder, path.join(parentFolder, 'node_modules', packageToPurge), 'dir');
+		else if(!fs.existsSync(localPackage)) fs.symlinkSync(localPackageFolder, localPackage, 'dir');
 
 		traverseNodeModules(localPackageFolder, (packageName, packageFolder) => {
 			if(packagesToPurge[packageName]) rmDir(packageFolder, opts);
