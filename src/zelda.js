@@ -61,7 +61,7 @@ function findLocalPackageFolders(parentFolder){
 		folderChildren = getChildFolders(folder);
 
 		for(var y = 0, yCount = folderChildren.length, folderGrandchild; y < yCount; ++y){
-			folderGrandchild = path.join(parentFolder, folderChildren[y]);
+			folderGrandchild = path.join(folder, folderChildren[y]);
 
 			if(fs.existsSync(path.join(folderGrandchild, 'package.json'))){
 				localPackageFolders.push(folder);
