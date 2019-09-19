@@ -5,17 +5,18 @@
 	"main": "src/index.js",
 	"bin": "src/index.js",
 	"dependencies": {
+		"log": "github:fatlard1993/log#2.x.x",
 		"find-root": "^1.1.0",
 		"performance-now": "^2.1.0",
-		"rimraf": "^2.6.3",
-		"yargs": "^13.2.2"
+		"rimraf": "^3.0.0",
+		"yargs": "^14.0.0"
 	},
 	"eslintConfig": {
 		"extends": "rules"
 	},
 	"devDependencies": {
-		"babel-eslint": "^10.0.1",
-		"eslint": "^5.15.3",
+		"babel-eslint": "^10.0.3",
+		"eslint": "^6.4.0",
 		"eslint-config-rules": "github:fatlard1993/eslint-config-rules"
 	},
 	"scripts": {
