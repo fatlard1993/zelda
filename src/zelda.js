@@ -5,12 +5,9 @@ const childProcess = require('child_process');
 const findRoot = require('find-root');
 const rimraf = require('rimraf');
 const now = require('performance-now');
+const log = require('log');
 
 const localPackageFolders = {};
-
-function log(msg){
-	console.log(`[zelda] ${msg}`);
-}
 
 function getLocalPackageFolder(parentFolders, packageName){
 	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
@@ -71,7 +68,7 @@ function findLocalPackageFolders(parentFolder){
 		}
 	}
 
-	log(`Found ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
+	log.info(`[zelda] Found ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
 
 	return localPackageFolders;
 }
@@ -86,7 +83,7 @@ function rmDir(folder, opts){
 
 function npmInstall(packageFolder, opts){
 	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
-		log(`${packageFolder} has no node_modules ... Must install to continue`);
+		log.warn(`[zelda] ${packageFolder} has no node_modules ... Must install to continue`);
 
 		opts.simulate = false;
 	}
@@ -98,7 +95,7 @@ function npmInstall(packageFolder, opts){
 	if(opts.simulate) log(`cd ${packageFolder} && npm i`);
 
 	else{
-		log(`Installing packages for ${packageFolder}`);
+		log.info(`[zelda] Installing packages for ${packageFolder}`);
 
 		childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
 	}
@@ -154,5 +151,5 @@ module.exports = function zelda(opts = {}){
 		});
 	});
 
-	if(packagesToPurgeCount) log(`${opts.simulate ? 'SIMULATED' : ''} Setup links for ${packagesToPurgeCount} local packages in ${(now() - start) / 1000}s. Packages: ${packageNamesToPurge.join(', ')}`);
+	if(packagesToPurgeCount) log.info(`[zelda] ${opts.simulate ? 'SIMULATED' : ''} Setup links for ${packagesToPurgeCount} local packages in ${(now() - start) / 1000}s. Packages: ${packageNamesToPurge.join(', ')}`);
 };
