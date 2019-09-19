@@ -76,7 +76,7 @@ function findLocalPackageFolders(parentFolder){
 function rmDir(folder, opts){
 	if(!fs.existsSync(folder)) return;
 
-	if(opts.simulate) return log(`rm -rf ${folder}`);
+	if(opts.simulate) return log(1)(`rm -rf ${folder}`);
 
 	rimraf.sync(folder);
 }
@@ -92,7 +92,7 @@ function npmInstall(packageFolder, opts){
 
 	rmDir(path.join(packageFolder, 'node_modules'), opts);
 
-	if(opts.simulate) log(`cd ${packageFolder} && npm i`);
+	if(opts.simulate) log(1)(`cd ${packageFolder} && npm i`);
 
 	else{
 		log.info(`[zelda] Installing packages for ${packageFolder}`);
@@ -115,7 +115,7 @@ module.exports = function zelda(opts = {}){
 	if(fs.existsSync(parentModulesFolder) && opts.clean) rmDir(parentModulesFolder, opts);
 
 	if(!fs.existsSync(parentModulesFolder)){
-		if(opts.simulate) log(`mkdir ${parentFolder}/node_modules`);
+		if(opts.simulate) log(1)(`mkdir ${parentFolder}/node_modules`);
 		else fs.mkdirSync(parentModulesFolder);
 	}
 
@@ -143,7 +143,7 @@ module.exports = function zelda(opts = {}){
 		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageToPurge);
 		const localPackage = path.join(parentFolder, 'node_modules', packageToPurge);
 
-		if(opts.simulate) log(`cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
+		if(opts.simulate) log(1)(`cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
 		else if(!fs.existsSync(localPackage)) fs.symlinkSync(localPackageFolder, localPackage, 'dir');
 
 		traverseNodeModules(localPackageFolder, (packageName, packageFolder) => {
