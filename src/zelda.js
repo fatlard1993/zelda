@@ -8,17 +8,20 @@ const now = require('performance-now');
 const log = require('log');
 
 const localPackageFolders = {};
+var opts = {};
 
 function getLocalPackageFolder(parentFolders, packageName){
 	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
 
 	let localPackageFolder;
 
-	parentFolders.forEach((folder) => {
-		folder = path.join(folder, packageName);
+	for(var x = 0, count = parentFolders.length; x < count; ++x){
+		localPackageFolder = path.join(parentFolders[x], packageName);
 
-		if(fs.existsSync(folder)) localPackageFolder = folder;
-	});
+		if(!fs.existsSync(localPackageFolder)) localPackageFolder = '';
+
+		else break;
+	}
 
 	if(localPackageFolder) localPackageFolders[packageName] = localPackageFolder;
 
@@ -57,10 +60,12 @@ function findLocalPackageFolders(parentFolder){
 		folder = path.join(parentFolder, folders[x]);
 		folderChildren = getChildFolders(folder);
 
-		for(var y = 0, yCount = folderChildren.length, folderGrandchild; y < yCount; ++y){
-			folderGrandchild = path.join(folder, folderChildren[y]);
+		if(fs.existsSync(path.join(folder, 'package.json')) && !localPackageFolders.includes(parentFolder)) localPackageFolders.push(parentFolder);
 
-			if(fs.existsSync(path.join(folderGrandchild, 'package.json'))){
+		for(var y = 0, yCount = folderChildren.length, folderChild; y < yCount; ++y){
+			folderChild = path.join(folder, folderChildren[y]);
+
+			if(fs.existsSync(path.join(folderChild, 'package.json')) && !localPackageFolders.includes(folder)){
 				localPackageFolders.push(folder);
 
 				break;
@@ -73,83 +78,101 @@ function findLocalPackageFolders(parentFolder){
 	return localPackageFolders;
 }
 
-function rmDir(folder, opts){
+function rmDir(folder){
 	if(!fs.existsSync(folder)) return;
 
-	if(opts.simulate) return log(1)(`rm -rf ${folder}`);
+	log(opts.simulate ? 0 : 1)(`rm -rf ${folder}`);
 
-	rimraf.sync(folder);
+	if(!opts.simulate) rimraf.sync(folder);
 }
 
-function npmInstall(packageFolder, opts){
+function npmInstall(packageFolder){
 	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
 		log.warn(`[zelda] ${packageFolder} has no node_modules ... Must install to continue`);
 
-		opts.simulate = false;
+		if(opts.simulate) return;
 	}
 
 	else if(!opts.install) return;
 
-	rmDir(path.join(packageFolder, 'node_modules'), opts);
+	rmDir(path.join(packageFolder, 'node_modules'));
 
-	if(opts.simulate) log(1)(`cd ${packageFolder} && npm i`);
+	log(opts.simulate ? 0 : 1)(`cd ${packageFolder} && npm i`);
 
-	else{
+	if(!opts.simulate){
 		log.info(`[zelda] Installing packages for ${packageFolder}`);
 
 		childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
 	}
 }
 
-module.exports = function zelda(opts = {}){
+module.exports = function zelda(options = {}){
+	opts = options;
+
 	const start = now();
 	const rootPackageFolder = findRoot(process.cwd());
-	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
+	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '../..');
 	const parentModulesFolder = path.join(parentFolder, 'node_modules');
-	let localPackageFolders = [parentFolder];
+	let localPackageFolders = [];
 
-	if(opts.autoFolders) localPackageFolders = localPackageFolders.concat(findLocalPackageFolders(parentFolder));
+	if(opts.autoFolders) localPackageFolders = findLocalPackageFolders(parentFolder);
 
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
-	if(fs.existsSync(parentModulesFolder) && opts.clean) rmDir(parentModulesFolder, opts);
+	if(fs.existsSync(parentModulesFolder) && opts.clean) rmDir(parentModulesFolder);
 
 	if(!fs.existsSync(parentModulesFolder)){
-		if(opts.simulate) log(1)(`mkdir ${parentFolder}/node_modules`);
-		else fs.mkdirSync(parentModulesFolder);
+		log(opts.simulate ? 0 : 1)(`mkdir ${parentFolder}/node_modules`);
+
+		if(!opts.simulate) fs.mkdirSync(parentModulesFolder);
 	}
 
-	npmInstall(rootPackageFolder, opts);
-
-	const packagesToPurge = {};
+	const packagesToLink = [];
+	const linked = [];
+	var traversed = 0;
 
 	traverseNodeModules(rootPackageFolder, (packageName) => {
-		if(packagesToPurge[packageName]) return;
+		log(2)(`Checking for local copy of "${packageName}"`);
+
+		++traversed;
+
+		if(packagesToLink[packageName]) return;
 
 		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageName);
 
 		if(!localPackageFolder) return;
 
-		packagesToPurge[packageName] = true;
+		packagesToLink.push([packageName, localPackageFolder]);
+		packagesToLink[packageName] = true;
 
-		npmInstall(localPackageFolder, opts);
-
-		rmDir(path.join(rootPackageFolder, 'node_modules', packageName), opts);
+		npmInstall(localPackageFolder);
 	});
 
-	const packageNamesToPurge = Object.keys(packagesToPurge), packagesToPurgeCount = packageNamesToPurge.length;
+	packagesToLink.forEach((packageArr) => {
+		const folder = packageArr[1], name = packageArr[0];
+		const link = path.join(parentFolder, 'node_modules', name);
 
-	packageNamesToPurge.forEach((packageToPurge) => {
-		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageToPurge);
-		const localPackage = path.join(parentFolder, 'node_modules', packageToPurge);
+		rmDir(path.join(rootPackageFolder, 'node_modules', name));
 
-		if(opts.simulate) log(1)(`cd ${parentFolder}/node_modules && ln -s ${localPackageFolder} ${packageToPurge}`);
-		else if(!fs.existsSync(localPackage)) fs.symlinkSync(localPackageFolder, localPackage, 'dir');
+		if(opts.install) rmDir(link);
 
-		traverseNodeModules(localPackageFolder, (packageName, packageFolder) => {
-			if(packagesToPurge[packageName]) rmDir(packageFolder, opts);
+		if(!fs.existsSync(link)){
+			linked.push(name);
+
+			log(opts.simulate ? 0 : 1)(`cd ${parentFolder}/node_modules && ln -s ${folder} ${name}`);
+
+			if(!opts.simulate) fs.symlinkSync(folder, link, 'dir');
+		}
+
+		else log(1)(`Link for ${name} already exists`);
+
+		traverseNodeModules(parentFolder, (packageName, packageFolder) => {
+			log(2)(`Checking for nested copy of "${packageName}"`);
+
+			if(packagesToLink[packageName]) rmDir(packageFolder);
 		});
 	});
 
-	if(packagesToPurgeCount) log.info(`[zelda] ${opts.simulate ? 'SIMULATED' : ''} Setup links for ${packagesToPurgeCount} local packages in ${(now() - start) / 1000}s. Packages: ${packageNamesToPurge.join(', ')}`);
+	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${packagesToLink.length} local packages ... Setup links for ${linked.length} ... took ${(now() - start) / 1000}s`);
+	log.info(opts.simulate ? 0 : 1)(linked);
 };
