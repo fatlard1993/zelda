@@ -14,7 +14,7 @@ yargs.alias({
 	f: 'folder'
 });
 
-yargs.boolean(['h', 'color', 'ver', 'i', 's', 'a']);
+yargs.boolean(['h', 'ver', 'i', 's', 'a']);
 
 yargs.default({
 	v: 1
@@ -22,14 +22,13 @@ yargs.default({
 
 yargs.describe({
 	h: 'This',
-	color: 'Enables colored logs',
 	v: '<level>',
 	c: 'Clean old symlinks first',
 	i: 'Force run `npm install` on each package',
 	s: 'See what would happen, without making changes',
 	a: 'Automatically detect folders to source modules',
-	p: 'The top level folder containing all your code',
-	f: 'Add an additional folder to source modules'
+	p: '<folder> (The top level folder containing all your code)',
+	f: '<folder> (Add an additional folder to source modules)'
 });
 
 var args = yargs.argv;
@@ -38,11 +37,11 @@ args.v = Number(args.v);
 
 //log args polyfill
 process.env.DBG = args.v;
-process.env.COLOR = args.ver || args.c;
+process.env.COLOR = true;
 
 const log = require('log');
 
-log('[zelda] Starting...');
+log(1)(args);
 
 const zelda = require('./zelda');
 
