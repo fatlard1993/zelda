@@ -29,11 +29,17 @@ function getLocalPackageFolder(parentFolders, packageName){
 }
 
 function getChildFolders(folder){
-	return fs.readdirSync(folder).filter((entry) => {
-		const stats = fs.lstatSync(path.join(folder, entry));
+	try{
+		return fs.readdirSync(folder).filter((entry) => {
+			const stats = fs.lstatSync(path.join(folder, entry));
 
-		return stats.isDirectory() && !stats.isSymbolicLink();
-	});
+			return stats.isDirectory() && !stats.isSymbolicLink();
+		});
+	}
+
+	catch(e){
+		return [];
+	}
 }
 
 function traverseNodeModules(pkgPath, cb){
@@ -111,7 +117,7 @@ module.exports = function zelda(options = {}){
 
 	const start = now();
 	const rootPackageFolder = findRoot(process.cwd());
-	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '../..');
+	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
 	const parentModulesFolder = path.join(parentFolder, 'node_modules');
 	let localPackageFolders = [];
 
