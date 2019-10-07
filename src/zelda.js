@@ -8,14 +8,14 @@ const now = require('performance-now');
 const log = require('log');
 
 const localPackageFolders = {};
-var opts = {};
+let opts = {};
 
 function getLocalPackageFolder(parentFolders, packageName){
 	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
 
 	let localPackageFolder;
 
-	for(var x = 0, count = parentFolders.length; x < count; ++x){
+	for(let x = 0, count = parentFolders.length; x < count; ++x){
 		localPackageFolder = path.join(parentFolders[x], packageName);
 
 		if(!fs.existsSync(localPackageFolder)) localPackageFolder = '';
@@ -62,13 +62,13 @@ function findLocalPackageFolders(parentFolder){
 	const folders = getChildFolders(parentFolder);
 	const localPackageFolders = [];
 
-	for(var x = 0, count = folders.length, folder, folderChildren; x < count; ++x){
+	for(let x = 0, count = folders.length, folder, folderChildren; x < count; ++x){
 		folder = path.join(parentFolder, folders[x]);
 		folderChildren = getChildFolders(folder);
 
 		if(fs.existsSync(path.join(folder, 'package.json')) && !localPackageFolders.includes(parentFolder)) localPackageFolders.push(parentFolder);
 
-		for(var y = 0, yCount = folderChildren.length, folderChild; y < yCount; ++y){
+		for(let y = 0, yCount = folderChildren.length, folderChild; y < yCount; ++y){
 			folderChild = path.join(folder, folderChildren[y]);
 
 			if(fs.existsSync(path.join(folderChild, 'package.json')) && !localPackageFolders.includes(folder)){
@@ -121,6 +121,8 @@ module.exports = function zelda(options = {}){
 	const parentModulesFolder = path.join(parentFolder, 'node_modules');
 	let localPackageFolders = [];
 
+	npmInstall(rootPackageFolder);
+
 	if(opts.autoFolders) localPackageFolders = findLocalPackageFolders(parentFolder);
 
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
@@ -135,7 +137,7 @@ module.exports = function zelda(options = {}){
 
 	const packagesToLink = [];
 	const linked = [];
-	var traversed = 0;
+	let traversed = 0;
 
 	traverseNodeModules(rootPackageFolder, (packageName) => {
 		log(2)(`Checking for local copy of "${packageName}"`);
