@@ -28,7 +28,7 @@ yargs.describe({
 	s: 'See what would happen, without making changes',
 	a: 'Automatically detect folders to source modules',
 	p: '<folder> (The top level folder containing all your code)',
-	f: '<folder> (Add an additional folder to source modules)'
+	f: '<folder> (An additional folder to source modules)'
 });
 
 var args = yargs.argv;
