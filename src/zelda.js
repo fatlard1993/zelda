@@ -135,6 +135,8 @@ module.exports = function zelda(options = {}){
 		if(!opts.simulate) fs.mkdirSync(parentModulesFolder);
 	}
 
+	if(!localPackageFolders.length) return log.warn(`[zelda] No local package folders configured`);
+
 	const packagesToLink = [];
 	const linked = [];
 	let traversed = 0;
