@@ -154,6 +154,8 @@ module.exports = function zelda(options = {}){
 
 		if(!localPackageFolder) return;
 
+		log(1)(`Found local copy of "${packageName}"`);
+
 		packagesToLink.push([packageName, localPackageFolder]);
 		packagesToLink[packageName] = true;
 
