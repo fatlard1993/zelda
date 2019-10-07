@@ -121,6 +121,8 @@ module.exports = function zelda(options = {}){
 	const parentModulesFolder = path.join(parentFolder, 'node_modules');
 	let localPackageFolders = [];
 
+	log.info(`[zelda] Using "${parentFolder}" to store links`);
+
 	npmInstall(rootPackageFolder);
 
 	if(opts.autoFolders) localPackageFolders = findLocalPackageFolders(parentFolder);
@@ -177,7 +179,7 @@ module.exports = function zelda(options = {}){
 		else log(1)(`Link for ${name} already exists`);
 
 		traverseNodeModules(parentFolder, (packageName, packageFolder) => {
-			log(2)(`Checking for nested copy of "${packageName}"`);
+			log(2)(`Checking for nested copy of "${packageName}" in "${packageFolder}"`);
 
 			if(packagesToLink[packageName]) rmDir(packageFolder);
 		});
