@@ -5,81 +5,66 @@
 Sometimes Link needs a little help from Zelda.
 
 
-### Features
+## Features
 
 - Automatically `npm link` all your packages together
-- Recursively runs `npm install` so your freshly cloned projects are ready to go!
+- Support for recursively running `npm install` (Automatically runs if node_modules is missing)
 
 
-### Usage
+## Usage
 
 1. Install it globally.
 
-```bash
-npm install -g fatlard1993/zelda
-```
+`npm install -g fatlard1993/zelda`
 
 2. Run `zelda` from your node project directory. For example:
 
-```bash
-cd ~/code/my-project
-zelda
-```
-
-`zelda` finds all the node packages in your code folder (`~/code/` in the example).
-If any of these packages are listed as a dependency in the nearest `package.json`
-of your working directory, it automatically symlinks it for you.
-
-Zelda assumes that all your code lives in the directory one level up from the
-folder where you run `zelda`. So, keep all your packages in a single folder like
-`~/code` and run `zelda` inside one of the projects (ex: `~/code/my-project`).
+~/Projects/my-awesome-project$ `zelda`
 
 
 ### Options
 
-```bash
-zelda --help
-```
-
 ```
 Options:
+  -h, --help          Show help                                        [boolean]
+  -v, --verbosity     <level>                                       [default: 1]
+  -c, --clean         Clean old symlinks first
   -i, --install       Force run `npm install` on each package          [boolean]
   -s, --simulate      See what would happen, without making changes    [boolean]
   -a, --autoFolders   Automatically detect folders to source modules   [boolean]
-  -p, --parentFolder  The top level folder containing all your code
-  -f, --folder        Add an additional folder to source modules
-  -h, --help          Show help                                        [boolean]
-  -v, --version       Show version number                              [boolean]
+  -p, --parentFolder  <folder> (The top level folder containing all your code)
+  -f, --folder        <folder> (An additional folder to source modules)
+  --ver, --version    Show version number                              [boolean]
 ```
 
 
 ### Example
 
-1. Clone a cool project.
+1. Clone a cool project
 
-```bash
-mkdir ~/code
-cd ~/code
+```
+mkdir -p ~/Projects
+cd ~/Projects
 git clone https://github.com/feross/webtorrent.git
 ```
 
-2. Clone the project dependencies you plan to work on.
+2. Clone the project dependencies you plan to work on
 
-```bash
+```
 git clone https://github.com/feross/bittorrent-protocol.git
 git clone https://github.com/feross/bittorrent-swarm.git
 git clone https://github.com/feross/bittorrent-dht.git
 ```
 
-3. Recursively `npm install` all project dependencies, `npm link` any local ones.
+3. Recursively `npm install` all project dependencies, `npm link` any local ones
 
-```bash
-cd webtorrent
-zelda
+```
+cd ~/Projects/webtorrent
+zelda -a
 ```
 
 
-### Link is better with Zelda
+## Link is better with Zelda
 
 Gone are the days of running tons of `npm link` commands by hand!
 
