@@ -9,14 +9,14 @@
 		"find-root": "^1.1.0",
 		"performance-now": "^2.1.0",
 		"rimraf": "^3.0.0",
-		"yargs": "^14.0.0"
+		"yargs": "^14.2.0"
 	},
 	"eslintConfig": {
 		"extends": "rules"
 	},
 	"devDependencies": {
 		"babel-eslint": "^10.0.3",
-		"eslint": "^6.4.0",
+		"eslint": "^6.5.1",
 		"eslint-config-rules": "github:fatlard1993/eslint-config-rules"
 	},
 	"scripts": {
