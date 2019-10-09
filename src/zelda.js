@@ -108,8 +108,6 @@ function rmDir(folder){
 function npmInstall(packageFolder){
 	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
 		log.warn(`[zelda] ${packageFolder} has no node_modules ... Must install to continue`);
-
-		if(opts.simulate) return;
 	}
 
 	else if(!opts.install) return;
@@ -160,7 +158,7 @@ module.exports = function zelda(options = {}){
 
 	log.info(`[zelda] Checking "${rootPackageFolder}" for local packages`);
 
-	const packagesToLink = [];
+	const localPackages = {};
 	const linked = [];
 	let traversed = 0;
 	let cleaned = 0;
@@ -170,7 +168,7 @@ module.exports = function zelda(options = {}){
 
 		++traversed;
 
-		if(packagesToLink[packageName]) return;
+		if(localPackages[packageName]) return;
 
 		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageName);
 
@@ -178,12 +176,13 @@ module.exports = function zelda(options = {}){
 
 		log.info(`[zelda] Found local copy of "${packageName}"`);
 
-		packagesToLink.push([packageName, localPackageFolder]);
-		packagesToLink[packageName] = true;
+		localPackages[packageName] = localPackageFolder;
 	});
 
-	packagesToLink.forEach((packageArr) => {
-		const folder = packageArr[1], name = packageArr[0];
+	const localPackageNames = Object.keys(localPackages), localPackageCount = localPackageNames.length;
+
+	localPackageNames.forEach((name) => {
+		const folder = localPackages[name];
 		const link = path.join(parentFolder, 'node_modules', name);
 
 		++traversed;
@@ -213,7 +212,7 @@ module.exports = function zelda(options = {}){
 
 			++traversed;
 
-			if(packagesToLink[packageName]){
+			if(localPackages[packageName]){
 				log(1)(`Found nested copy of "${packageName}" in "${packageFolder}"`);
 
 				rmDir(packageFolder);
@@ -223,6 +222,5 @@ module.exports = function zelda(options = {}){
 		});
 	});
 
-	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${packagesToLink.length} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
-	log.info(opts.simulate ? 0 : 1)(packagesToLink, linked);
+	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${localPackageCount} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
 };
