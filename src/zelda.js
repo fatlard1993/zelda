@@ -31,9 +31,22 @@ function getLocalPackageFolder(parentFolders, packageName){
 function getChildFolders(folder){
 	try{
 		return fs.readdirSync(folder).filter((entry) => {
-			const stats = fs.lstatSync(path.join(folder, entry));
+			const location = path.join(folder, entry);
+			const stats = fs.lstatSync(location);
+			let isDir;
 
-			return stats.isDirectory() && !stats.isSymbolicLink();
+			if(stats.isSymbolicLink()){
+				try{
+					isDir = fs.readdirSync(location).length;
+				}
+				catch(err){
+					log(3)(err);
+				}
+			}
+
+			else isDir = stats.isDirectory() && entry !== '.bin';
+
+			return isDir;
 		});
 	}
 
@@ -42,12 +55,14 @@ function getChildFolders(folder){
 	}
 }
 
-function traverseNodeModules(pkgPath, cb){
-	const modulesPath = path.join(pkgPath, 'node_modules');
+function traverseNodeModules(packagePath, cb){
+	const modulesPath = path.join(packagePath, 'node_modules');
 
 	if(!fs.existsSync(modulesPath)) return;
 
 	const entries = getChildFolders(modulesPath);
+
+	log(2)(modulesPath, entries);
 
 	entries.forEach((entry) => {
 		const entryPath = path.join(modulesPath, entry);
@@ -78,8 +93,6 @@ function findLocalPackageFolders(parentFolder){
 			}
 		}
 	}
-
-	log.info(`[zelda] Found ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
 
 	return localPackageFolders;
 }
@@ -123,13 +136,17 @@ module.exports = function zelda(options = {}){
 
 	log.info(`[zelda] Using "${parentFolder}" to store links`);
 
-	npmInstall(rootPackageFolder);
+	if(fs.existsSync(parentModulesFolder) && opts.clean){
+		log.info(`[zelda] Cleaning "${parentModulesFolder}"`);
+
+		rmDir(parentModulesFolder);
+	}
 
 	if(opts.autoFolders) localPackageFolders = findLocalPackageFolders(parentFolder);
 
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
-	if(fs.existsSync(parentModulesFolder) && opts.clean) rmDir(parentModulesFolder);
+	log.info(`[zelda] Using ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
 
 	if(!fs.existsSync(parentModulesFolder)){
 		log(opts.simulate ? 0 : 1)(`mkdir ${parentFolder}/node_modules`);
@@ -139,9 +156,14 @@ module.exports = function zelda(options = {}){
 
 	if(!localPackageFolders.length) return log.warn(`[zelda] No local package folders configured`);
 
+	npmInstall(rootPackageFolder);
+
+	log.info(`[zelda] Checking "${rootPackageFolder}" for local packages`);
+
 	const packagesToLink = [];
 	const linked = [];
 	let traversed = 0;
+	let cleaned = 0;
 
 	traverseNodeModules(rootPackageFolder, (packageName) => {
 		log(2)(`Checking for local copy of "${packageName}"`);
@@ -154,23 +176,25 @@ module.exports = function zelda(options = {}){
 
 		if(!localPackageFolder) return;
 
-		log(1)(`Found local copy of "${packageName}"`);
+		log.info(`[zelda] Found local copy of "${packageName}"`);
 
 		packagesToLink.push([packageName, localPackageFolder]);
 		packagesToLink[packageName] = true;
-
-		npmInstall(localPackageFolder);
 	});
 
 	packagesToLink.forEach((packageArr) => {
 		const folder = packageArr[1], name = packageArr[0];
 		const link = path.join(parentFolder, 'node_modules', name);
 
+		++traversed;
+
 		rmDir(path.join(rootPackageFolder, 'node_modules', name));
 
-		if(opts.install) rmDir(link);
+		++cleaned;
 
 		if(!fs.existsSync(link)){
+			log.info(`[zelda] Linking local copy of "${name}"`);
+
 			linked.push(name);
 
 			log(opts.simulate ? 0 : 1)(`cd ${parentFolder}/node_modules && ln -s ${folder} ${name}`);
@@ -180,13 +204,25 @@ module.exports = function zelda(options = {}){
 
 		else log(1)(`Link for ${name} already exists`);
 
-		traverseNodeModules(parentFolder, (packageName, packageFolder) => {
+		npmInstall(folder);
+
+		log(1)(`Searching for nested copies in ${folder}`);
+
+		traverseNodeModules(folder, (packageName, packageFolder) => {
 			log(2)(`Checking for nested copy of "${packageName}" in "${packageFolder}"`);
 
-			if(packagesToLink[packageName]) rmDir(packageFolder);
+			++traversed;
+
+			if(packagesToLink[packageName]){
+				log(1)(`Found nested copy of "${packageName}" in "${packageFolder}"`);
+
+				rmDir(packageFolder);
+
+				++cleaned;
+			}
 		});
 	});
 
-	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${packagesToLink.length} local packages ... Setup links for ${linked.length} ... took ${(now() - start) / 1000}s`);
-	log.info(opts.simulate ? 0 : 1)(linked);
+	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${packagesToLink.length} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
+	log.info(opts.simulate ? 0 : 1)(packagesToLink, linked);
 };
