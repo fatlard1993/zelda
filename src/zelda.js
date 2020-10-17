@@ -5,7 +5,7 @@ const childProcess = require('child_process');
 const findRoot = require('find-root');
 const rimraf = require('rimraf');
 const now = require('performance-now');
-const log = require('log');
+const log = new (require('log'))({ tag: 'zelda' });
 
 const localPackageFolders = {};
 let opts = {};
@@ -107,7 +107,7 @@ function rmDir(folder){
 
 function npmInstall(packageFolder){
 	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
-		log.warn(`[zelda] ${packageFolder} has no node_modules ... Must install to continue`);
+		log.warn(`${packageFolder} has no node_modules ... Must install to continue`);
 	}
 
 	else if(!opts.install) return;
@@ -117,7 +117,7 @@ function npmInstall(packageFolder){
 	log(opts.simulate ? 0 : 1)(`cd ${packageFolder} && npm i`);
 
 	if(!opts.simulate){
-		log.info(`[zelda] Installing packages for ${packageFolder}`);
+		log.info(`Installing packages for ${packageFolder}`);
 
 		childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
 	}
@@ -132,10 +132,10 @@ module.exports = function zelda(options = {}){
 	const parentModulesFolder = path.join(parentFolder, 'node_modules');
 	let localPackageFolders = [];
 
-	log.info(`[zelda] Using "${parentFolder}" to store links`);
+	log.info(`Using "${parentFolder}" to store links`);
 
 	if(fs.existsSync(parentModulesFolder) && opts.clean){
-		log.info(`[zelda] Cleaning "${parentModulesFolder}"`);
+		log.info(`Cleaning "${parentModulesFolder}"`);
 
 		rmDir(parentModulesFolder);
 	}
@@ -144,7 +144,7 @@ module.exports = function zelda(options = {}){
 
 	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
 
-	log.info(`[zelda] Using ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
+	log.info(`Using ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
 
 	if(!fs.existsSync(parentModulesFolder)){
 		log(opts.simulate ? 0 : 1)(`mkdir ${parentFolder}/node_modules`);
@@ -152,11 +152,11 @@ module.exports = function zelda(options = {}){
 		if(!opts.simulate) fs.mkdirSync(parentModulesFolder);
 	}
 
-	if(!localPackageFolders.length) return log.warn(`[zelda] No local package folders configured`);
+	if(!localPackageFolders.length) return log.warn(`No local package folders configured`);
 
 	npmInstall(rootPackageFolder);
 
-	log.info(`[zelda] Checking "${rootPackageFolder}" for local packages`);
+	log.info(`Checking "${rootPackageFolder}" for local packages`);
 
 	const localPackages = {};
 	const linked = [];
@@ -174,7 +174,7 @@ module.exports = function zelda(options = {}){
 
 		if(!localPackageFolder) return;
 
-		log.info(`[zelda] Found local copy of "${packageName}"`);
+		log.info(`Found local copy of "${packageName}"`);
 
 		localPackages[packageName] = localPackageFolder;
 	});
@@ -192,7 +192,7 @@ module.exports = function zelda(options = {}){
 		++cleaned;
 
 		if(!fs.existsSync(link)){
-			log.info(`[zelda] Linking local copy of "${name}"`);
+			log.info(`Linking local copy of "${name}"`);
 
 			linked.push(name);
 
@@ -222,5 +222,5 @@ module.exports = function zelda(options = {}){
 		});
 	});
 
-	log.info(`[zelda]${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${localPackageCount} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
+	log.info(`${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${localPackageCount} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
 };

@@ -33,15 +33,13 @@ yargs.describe({
 
 var args = yargs.argv;
 
-args.v = Number(args.v);
+['_', '$0', 'v', 'c', 'i', 's', 'a', 'p', 'f'].forEach((item) => { delete args[item]; });
 
-//log args polyfill
-process.env.DBG = args.v;
-process.env.COLOR = true;
+var opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
 
-const log = require('log');
+const log = new (require('log'))({ tag: 'zelda', color: true, verbosity: opts.verbosity });
 
-log(1)(args);
+log(1)('Options', opts);
 
 const zelda = require('./zelda');
 
