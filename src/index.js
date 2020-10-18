@@ -14,7 +14,7 @@ yargs.alias({
 	f: 'folder'
 });
 
-yargs.boolean(['h', 'ver', 'i', 's', 'a']);
+yargs.boolean(['h', 'ver', 'i', 's', 'a', 'r']);
 
 yargs.default({
 	v: 1
@@ -31,16 +31,14 @@ yargs.describe({
 	f: '<folder> (An additional folder to source modules)'
 });
 
-var args = yargs.argv;
+const args = yargs.argv;
 
-['_', '$0', 'v', 'c', 'i', 's', 'a', 'p', 'f'].forEach((item) => { delete args[item]; });
+['_', '$0', 'v', 'c', 'i', 's', 'a', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
 
-var opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
+const opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
 
 const log = new (require('log'))({ tag: 'zelda', color: true, verbosity: opts.verbosity });
 
 log(1)('Options', opts);
 
-const zelda = require('./zelda');
-
-zelda(args);
+require('./zelda')(opts);
