@@ -1,18 +1,97 @@
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const childProcess = require('child_process');
 
 const findRoot = require('find-root');
-const rimraf = require('rimraf');
+const fsExtended = require('fs-extended');
 const now = require('performance-now');
-const log = new (require('log'))({ tag: 'zelda' });
+const zlog = new (require('log'))({ tag: 'zelda' });
+const log = new (require('log'))({ verbosity: zlog.opts.verbosity });
 
-const localPackageFolders = {};
-let opts = {};
+function forEachNodeModule(packagePath, cb){
+	const modulesPath = path.join(packagePath, 'node_modules');
 
-function getLocalPackageFolder(parentFolders, packageName){
-	if(localPackageFolders[packageName]) return localPackageFolders[packageName];
+	if(!fs.existsSync(modulesPath)) return;
 
+	const modules = fsExtended.getChildFolders(modulesPath, { blacklist: { '.bin': 1 }});
+
+	modules.forEach((packageName) => {
+		const packagePath = path.join(modulesPath, packageName);
+
+		cb(packageName, packagePath);
+
+		forEachNodeModule(packagePath, cb);
+	});
+}
+
+function forEachPackage(parentFolder, cb){
+	if(!fs.existsSync(parentFolder)) return;
+
+	const packages = fsExtended.getChildFolders(parentFolder, { blacklist: { '.bin': 1 }});
+
+	packages.forEach((packageName) => {
+		const packagePath = path.join(parentFolder, packageName);
+
+		if(!fs.existsSync(path.join(packagePath, 'package.json'))) return;
+
+		cb(packageName, packagePath);
+
+		forEachPackage(packagePath, cb);
+	});
+}
+
+function folderContainsPackages(parentFolder){
+	let result = false;
+
+	if(parentFolder === os.homedir()) return false;
+
+	const folders = fsExtended.getChildFolders(parentFolder, { blacklist: { node_modules: 1 } });
+
+	for(let x = 0, count = folders.length, folder; x < count; ++x){
+		folder = folders[x];
+
+		if(folder[0] !== '.' && !fs.existsSync(path.join(parentFolder, folder, 'package.json'))) continue;
+
+		result = true;
+
+		break;
+	}
+
+	return result;
+}
+
+function findProjectRoot(targetFolder){
+	if(targetFolder === os.homedir()) return log.error('Could not find project root');
+
+	let projectRoot;
+	const parentFolder = path.resolve(targetFolder, '..');
+	const grandparentFolder = path.resolve(parentFolder, '..');
+
+	var parentContainPackages = folderContainsPackages(parentFolder), grandparentContainsPackages = folderContainsPackages(grandparentFolder);
+
+	log.info(4)(parentFolder, parentContainPackages, grandparentFolder, grandparentContainsPackages);
+
+	if(parentContainPackages && !grandparentContainsPackages) projectRoot = parentFolder;
+
+	if(!projectRoot) projectRoot = findProjectRoot(parentFolder);
+
+	return projectRoot;
+}
+
+function findPackageSourceFolders(targetFolder, levels){
+	let folders = {};
+
+	if(!levels || fs.existsSync(path.join(targetFolder, 'package.json'))) return folders;
+
+	if(folderContainsPackages(targetFolder)) folders[targetFolder] = 1;
+
+	fsExtended.getChildFolders(targetFolder, { blacklist: { node_modules: 1 } }).forEach((folder) => { folders = Object.assign(folders, findPackageSourceFolders(path.join(targetFolder, folder), levels - 1)); });
+
+	return folders;
+}
+
+function findPackage(parentFolders, packageName){
 	let localPackageFolder;
 
 	for(let x = 0, count = parentFolders.length; x < count; ++x){
@@ -23,204 +102,212 @@ function getLocalPackageFolder(parentFolders, packageName){
 		else break;
 	}
 
-	if(localPackageFolder) localPackageFolders[packageName] = localPackageFolder;
-
 	return localPackageFolder;
 }
 
-function getChildFolders(folder){
-	try{
-		return fs.readdirSync(folder).filter((entry) => {
-			const location = path.join(folder, entry);
-			const stats = fs.lstatSync(location);
-			let isDir;
+module.exports = function zelda(opts = {}){
+	const simulationVerbosity = opts.simulate ? 0 : 3;
 
-			if(stats.isSymbolicLink()){
-				try{
-					isDir = fs.readdirSync(location).length;
-				}
-				catch(err){
-					log(3)(err);
-				}
-			}
+	function rmdir(folder){
+		if(!fs.existsSync(folder)) return;
 
-			else isDir = stats.isDirectory() && entry !== '.bin';
+		log.warn(simulationVerbosity)(`$ rm -rf ${folder}`);
 
-			return isDir;
+		if(!opts.simulate) fsExtended.rmPattern(folder, /.*/);
+	}
+
+	function mkdir(folder){
+		if(fs.existsSync(folder)) return;
+
+		log.warn(simulationVerbosity)(`$ mkdir -p ${folder}`);
+
+		if(!opts.simulate) fsExtended.mkdir(folder);
+	}
+
+	function spawnPackageManager(args, cwd){
+		const platformSpecific = {
+			win32: 'npm.cmd',
+			default: 'npm'
+		}, cmd = platformSpecific[process.platform] || platformSpecific.default;
+
+		log.warn(simulationVerbosity)(`$ cd ${cwd} && ${cmd} ${args}`);
+
+		return opts.simulate ? { status: 1 } : childProcess.spawnSync(cmd, args, { cwd: cwd, stdio: 'inherit' });
+	}
+
+	function logArr(verbosity, label, arr){ log.info(verbosity)(`\n[[${label}]]\n ┣ ${arr.join('\n ┣ ')}\n`); }
+
+	const start = now();
+	const tempCache = path.join(findRoot(__dirname), 'temp/cache');
+
+	const targetPackageRoot = findRoot(opts.target || process.cwd());
+	const targetNodeModules = path.join(targetPackageRoot, 'node_modules');
+	const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'));
+	const rootNodeModules = path.join(projectRoot, 'node_modules');
+
+	log.warn(`\nTargeting: ${targetPackageRoot} .. Using "${rootNodeModules}" to store links\n`);
+
+	let traversed = 0, totalInstalledPackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, symlinkedFileCount = 0, cleaned = 0;
+
+	function printStats(){
+		let time = (now() - start) / 1000;
+
+		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - (Math.floor(time / 60) * 60)}s`;
+
+		zlog[opts.simulate ? 'warn' : 'info'](`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized ${totalPreMappedPackages} pre-mapped packages .. Found ${foundPackageCount} local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Took ${time}`);
+	}
+
+	let searchFolders = [];
+
+	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
+	if(opts.folder) searchFolders = searchFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
+
+	if(!searchFolders.length) return log.error(`No package source folders are configured`);
+
+	log.info(`Using ${searchFolders.length} folders to search for local packages`);
+	logArr(1, 'searchFolders', searchFolders);
+
+	if(opts.clean){
+		rmdir(rootNodeModules);
+		rmdir(tempCache);
+		rmdir(targetNodeModules);
+	}
+
+	mkdir(rootNodeModules);
+	mkdir(tempCache);
+	mkdir(targetNodeModules);
+
+	if(opts.recursive){
+		searchFolders.forEach((parentFolder) => {
+			forEachPackage(parentFolder, (packageName) => {
+				const stats = zelda(Object.assign(opts, { clean: false, recursive: false, target: path.join(parentFolder, packageName) }));
+
+				traversed += stats.traversed;
+				totalInstalledPackages += stats.totalInstalledPackages;
+				totalPreMappedPackages += stats.totalPreMappedPackages;
+				foundPackageCount += stats.foundPackageCount;
+				symlinkedFileCount += stats.symlinkedFileCount;
+				cleaned += stats.cleaned;
+			});
 		});
+
+		printStats();
+
+		return;
 	}
 
-	catch(e){
-		return [];
+	const targetPackageJSON = require(path.join(targetPackageRoot, 'package.json'));
+	const targetPackageDependencyNames = Object.keys(targetPackageJSON.dependencies || {});
+	const preMappedPackageNames = fs.readdirSync(rootNodeModules);
+	const preMappedPackages = Object.fromEntries(preMappedPackageNames.map((item) => { return [item, 1]; }));
+	const tempCacheNames = fs.readdirSync(tempCache) || [];
+	const dependenciesToInstall = [], foundPackages = {};
+
+	function findLocalCopy(packageName){
+		log(3)(`Checking for local copy of "${packageName}"`);
+
+		++traversed;
+
+		if(preMappedPackages[packageName]) return preMappedPackages[packageName];
+		if(foundPackages[packageName]) return foundPackages[packageName];
+
+		const foundPackage = findPackage(searchFolders, packageName);
+
+		if(foundPackage){
+			foundPackages[packageName] = foundPackage;
+
+			log.info(2)(`Found local copy of "${packageName}"`);
+		}
+
+		return foundPackage;
 	}
-}
 
-function traverseNodeModules(packagePath, cb){
-	const modulesPath = path.join(packagePath, 'node_modules');
+	logArr(2, 'targetPackageDependencyNames', targetPackageDependencyNames);
+	if(!opts.clean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
+	if(opts.npmCache && tempCacheNames.length) logArr(2, 'tempCacheNames', tempCacheNames);
 
-	if(!fs.existsSync(modulesPath)) return;
+	targetPackageDependencyNames.forEach((name) => {
+		if(preMappedPackages[name]) return ++totalPreMappedPackages;
 
-	const entries = getChildFolders(modulesPath);
+		if(opts.npmCache){
+			const tarCacheFile = tempCacheNames.filter((tarName) => { return new RegExp(`.*\\b${name}\\b.*\\.tgz`).test(tarName); })[0];
 
-	log(2)(modulesPath, entries);
+			if(tarCacheFile) return dependenciesToInstall.push(path.join(tempCache, tarCacheFile));
+		}
 
-	entries.forEach((entry) => {
-		const entryPath = path.join(modulesPath, entry);
-
-		cb(entry, entryPath);
-
-		traverseNodeModules(entryPath, cb);
+		if(!findLocalCopy(name)) dependenciesToInstall.push(name);
 	});
-}
 
-function findLocalPackageFolders(parentFolder){
-	const folders = getChildFolders(parentFolder);
-	const localPackageFolders = [];
+	const dependenciesToInstallCount = dependenciesToInstall.length;
 
-	for(let x = 0, count = folders.length, folder, folderChildren; x < count; ++x){
-		folder = path.join(parentFolder, folders[x]);
-		folderChildren = getChildFolders(folder);
+	if(dependenciesToInstallCount){
+		log.info(`Installing ${dependenciesToInstallCount} packages for ${targetPackageRoot}`);
+		logArr(1, 'dependenciesToInstall', dependenciesToInstall);
 
-		if(fs.existsSync(path.join(folder, 'package.json')) && !localPackageFolders.includes(parentFolder)) localPackageFolders.push(parentFolder);
+		totalInstalledPackages += dependenciesToInstallCount;
 
-		for(let y = 0, yCount = folderChildren.length, folderChild; y < yCount; ++y){
-			folderChild = path.join(folder, folderChildren[y]);
+		spawnPackageManager(['i', '--silent', '--no-save'].concat(dependenciesToInstall), targetPackageRoot);
 
-			if(fs.existsSync(path.join(folderChild, 'package.json')) && !localPackageFolders.includes(folder)){
-				localPackageFolders.push(folder);
+		if(opts.npmCache){
+			dependenciesToInstall.forEach((name) => {
+				if(name.endsWith('.tgz')) return;
 
-				break;
-			}
+				log.info(`Caching ${name}`);
+
+				var installResult = spawnPackageManager(['pack', '--silent', name], path.join(tempCache));
+
+				log.warn(installResult.status === 0 ? 2 : 0)('Pack install result', installResult);
+
+				if(installResult.status !== 0) log.warn(`Unable to pack ${name}`);
+			});
 		}
 	}
 
-	return localPackageFolders;
-}
+	forEachNodeModule(targetPackageRoot, findLocalCopy);
 
-function rmDir(folder){
-	if(!fs.existsSync(folder)) return;
+	const foundPackageNames = Object.keys(foundPackages);
+	foundPackageCount += foundPackageNames.length;
 
-	log(opts.simulate ? 0 : 1)(`rm -rf ${folder}`);
+	if(foundPackageCount) logArr(2, 'foundPackageNames', foundPackageNames);
 
-	if(!opts.simulate) rimraf.sync(folder);
-}
+	const symlinkedFileNames = [];
 
-function npmInstall(packageFolder){
-	if(!fs.existsSync(path.join(packageFolder, 'node_modules'))){
-		log.warn(`${packageFolder} has no node_modules ... Must install to continue`);
-	}
-
-	else if(!opts.install) return;
-
-	rmDir(path.join(packageFolder, 'node_modules'));
-
-	log(opts.simulate ? 0 : 1)(`cd ${packageFolder} && npm i`);
-
-	if(!opts.simulate){
-		log.info(`Installing packages for ${packageFolder}`);
-
-		childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['i', '--loglevel=error'], { cwd: packageFolder, stdio: 'inherit' });
-	}
-}
-
-module.exports = function zelda(options = {}){
-	opts = options;
-
-	const start = now();
-	const rootPackageFolder = findRoot(process.cwd());
-	const parentFolder = opts.parentFolder ? path.resolve(opts.parentFolder) : path.resolve(rootPackageFolder, '..');
-	const parentModulesFolder = path.join(parentFolder, 'node_modules');
-	let localPackageFolders = [];
-
-	log.info(`Using "${parentFolder}" to store links`);
-
-	if(fs.existsSync(parentModulesFolder) && opts.clean){
-		log.info(`Cleaning "${parentModulesFolder}"`);
-
-		rmDir(parentModulesFolder);
-	}
-
-	if(opts.autoFolders) localPackageFolders = findLocalPackageFolders(parentFolder);
-
-	if(opts.folder) localPackageFolders = localPackageFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
-
-	log.info(`Using ${localPackageFolders.length} local package folders: ${localPackageFolders.join(', ')}`);
-
-	if(!fs.existsSync(parentModulesFolder)){
-		log(opts.simulate ? 0 : 1)(`mkdir ${parentFolder}/node_modules`);
-
-		if(!opts.simulate) fs.mkdirSync(parentModulesFolder);
-	}
-
-	if(!localPackageFolders.length) return log.warn(`No local package folders configured`);
-
-	npmInstall(rootPackageFolder);
-
-	log.info(`Checking "${rootPackageFolder}" for local packages`);
-
-	const localPackages = {};
-	const linked = [];
-	let traversed = 0;
-	let cleaned = 0;
-
-	traverseNodeModules(rootPackageFolder, (packageName) => {
-		log(2)(`Checking for local copy of "${packageName}"`);
+	foundPackageNames.forEach((name) => {
+		const foundPackageLocation = foundPackages[name];
 
 		++traversed;
 
-		if(localPackages[packageName]) return;
-
-		const localPackageFolder = getLocalPackageFolder(localPackageFolders, packageName);
-
-		if(!localPackageFolder) return;
-
-		log.info(`Found local copy of "${packageName}"`);
-
-		localPackages[packageName] = localPackageFolder;
-	});
-
-	const localPackageNames = Object.keys(localPackages), localPackageCount = localPackageNames.length;
-
-	localPackageNames.forEach((name) => {
-		const folder = localPackages[name];
-		const link = path.join(parentFolder, 'node_modules', name);
-
-		++traversed;
-
-		rmDir(path.join(rootPackageFolder, 'node_modules', name));
+		rmdir(path.join(targetPackageRoot, 'node_modules', name));
 
 		++cleaned;
 
-		if(!fs.existsSync(link)){
-			log.info(`Linking local copy of "${name}"`);
+		if(!fs.existsSync(path.join(rootNodeModules, name))){
+			log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
 
-			linked.push(name);
+			symlinkedFileNames.push(name);
 
-			log(opts.simulate ? 0 : 1)(`cd ${parentFolder}/node_modules && ln -s ${folder} ${name}`);
+			log.warn(simulationVerbosity)(`cd ${rootNodeModules} && ln -s ${foundPackageLocation} ${name}`);
 
-			if(!opts.simulate) fs.symlinkSync(folder, link, 'dir');
+			if(!opts.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
 		}
 
-		else log(1)(`Link for ${name} already exists`);
+		if(foundPackageLocation !== targetPackageRoot){
+			const stats = zelda(Object.assign(opts, { target: foundPackageLocation }));
 
-		npmInstall(folder);
-
-		log(1)(`Searching for nested copies in ${folder}`);
-
-		traverseNodeModules(folder, (packageName, packageFolder) => {
-			log(2)(`Checking for nested copy of "${packageName}" in "${packageFolder}"`);
-
-			++traversed;
-
-			if(localPackages[packageName]){
-				log(1)(`Found nested copy of "${packageName}" in "${packageFolder}"`);
-
-				rmDir(packageFolder);
-
-				++cleaned;
-			}
-		});
+			traversed += stats.traversed;
+			totalInstalledPackages += stats.totalInstalledPackages;
+			totalPreMappedPackages += stats.totalPreMappedPackages;
+			foundPackageCount += stats.foundPackageCount;
+			symlinkedFileCount += stats.symlinkedFileCount;
+			cleaned += stats.cleaned;
+		}
 	});
 
-	log.info(`${opts.simulate ? '[simulate]' : ''} Traversed ${traversed} folders ... Found ${localPackageCount} local packages ... Setup ${linked.length} links ... Cleaned ${cleaned} references ... Took ${(now() - start) / 1000}s`);
+	symlinkedFileCount += symlinkedFileNames.length;
+
+	if(symlinkedFileCount) logArr(1, 'symlinkedFileNames', symlinkedFileNames);
+
+	printStats();
+
+	return { traversed, totalInstalledPackages, totalPreMappedPackages, foundPackageCount, symlinkedFileCount, cleaned };
 };

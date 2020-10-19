@@ -30,7 +30,6 @@
 		"fs-extended": "github:fatlard1993/fs-extended",
 		"find-root": "^1.1.0",
 		"performance-now": "^2.1.0",
-		"rimraf": "^3.0.2",
 		"yargs": "^15.3.1"
 	}
 }
