@@ -34,18 +34,18 @@ yargs.describe({
 	v: '<level>',
 	c: 'Clean old symlinks and npm cache first',
 	s: 'See what would happen, without making changes',
-	t: '<folder> The target package folder (defaults to process.cwd())',
+	t: '<folder> The target package folder(s) (defaults to process.cwd())',
 	a: 'Automatically find projectRoot and detect folders to source packages',
 	autoFoldersDepth: '<levels> The number of levels to traverse for finding source folders containing local packages',
 	p: '<folder> The top level folder containing all your code (defaults to targetPackage/..)',
-	f: '<folder> An additional folder to source packages',
+	f: '<folder> Additional folder(s) to source packages',
 	r: 'Recursively walk through and link all local git projects in the current source folders',
 	npmCache: 'Cache and use remote npm packages as a tarballs in zelda/temp'
 });
 
 const args = yargs.argv;
 
-['_', '$0', 'v', 'c', 's', 'a', 'd', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
+['_', '$0', 'v', 'c', 's', 't', 'a', 'd', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
 
 const opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
 

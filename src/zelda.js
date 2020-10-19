@@ -140,9 +140,9 @@ module.exports = function zelda(opts = {}){
 	const start = now();
 	const tempCache = path.join(findRoot(__dirname), 'temp/cache');
 
-	const targetPackageRoot = findRoot(opts.target || process.cwd());
+	const targetPackageRoot =  opts.target instanceof Array ? process.cwd() : findRoot(opts.target || process.cwd());
 	const targetNodeModules = path.join(targetPackageRoot, 'node_modules');
-	const projectRoot = opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'));
+	const projectRoot = (opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'))) || process.cwd();
 	const rootNodeModules = path.join(projectRoot, 'node_modules');
 
 	log.warn(`\nTargeting: ${targetPackageRoot} .. Using "${rootNodeModules}" to store links\n`);
@@ -185,6 +185,16 @@ module.exports = function zelda(opts = {}){
 	mkdir(rootNodeModules);
 	mkdir(tempCache);
 	mkdir(targetNodeModules);
+
+	if(opts.target instanceof Array){
+		opts.target.forEach((name) => {
+			updateStats(zelda(Object.assign(opts, { clean: false, recursive: false, target: path.resolve(projectRoot, name) })));
+		});
+
+		printStats();
+
+		return;
+	}
 
 	if(opts.recursive){
 		searchFolders.forEach((parentFolder) => {

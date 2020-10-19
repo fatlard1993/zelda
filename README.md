@@ -31,13 +31,13 @@ Options:
   -v, --verbosity         <level>                                   [default: 1]
   -c, --clean             Clean old symlinks and npm cache first
   -s, --simulate          See what would happen, without making changes[boolean]
-  -t, --target            <folder> The target package folder (defaults to
+  -t, --target            <folder> The target package folder(s) (defaults to
                           process.cwd())
   -a, --autoFolders       Automatically find projectRoot and detect folders to
                           source packages              [boolean] [default: true]
   -p, --projectRoot       <folder> The top level folder containing all your code
                           (defaults to targetPackage/..)
-  -f, --folder            <folder> An additional folder to source packages
+  -f, --folder            <folder> Additional folder(s) to source packages
   -r, --recursive         Recursively walk through and link all local git
                           projects in the current source folders       [boolean]
       --npmCache          Cache and use remote npm packages as a tarballs in
