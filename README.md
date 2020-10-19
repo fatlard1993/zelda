@@ -7,8 +7,9 @@ Sometimes Link needs a little help from Zelda.
 
 ## Features
 
-- Automatically `npm link` all your packages together
-- Support for recursively running `npm install` (Automatically runs if node_modules is missing)
+- Automatically `npm link` all your local packages together
+- Recursively run `npm install` on all local packages
+- A simple cache method built on `npm pack` for quicker consecutive installs of remote packages
 
 
 ## Usage
@@ -38,10 +39,10 @@ Options:
                           (defaults to targetPackage/..)
   -f, --folder            <folder> An additional folder to source packages
   -r, --recursive         Recursively walk through and link all local git
-                          projects in the current directory            [boolean]
-  --npmCache              Cache and use remote npm packages as a tarballs in
+                          projects in the current source folders       [boolean]
+      --npmCache          Cache and use remote npm packages as a tarballs in
                           zelda/temp                                   [boolean]
-  --ver, --version        Show version number                          [boolean]
+      --ver, --version    Show version number                          [boolean]
   -d, --autoFoldersDepth  <levels> The number of levels to traverse for finding
                           source folders containing local packages  [default: 2]
 ```
