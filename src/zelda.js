@@ -157,6 +157,15 @@ module.exports = function zelda(opts = {}){
 		zlog[opts.simulate ? 'warn' : 'info'](`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized ${totalPreMappedPackages} pre-mapped packages .. Found ${foundPackageCount} local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Took ${time}`);
 	}
 
+	function updateStats(stats){
+		traversed += stats.traversed;
+		totalInstalledPackages += stats.totalInstalledPackages;
+		totalPreMappedPackages += stats.totalPreMappedPackages;
+		foundPackageCount += stats.foundPackageCount;
+		symlinkedFileCount += stats.symlinkedFileCount;
+		cleaned += stats.cleaned;
+	}
+
 	let searchFolders = [];
 
 	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
@@ -180,14 +189,7 @@ module.exports = function zelda(opts = {}){
 	if(opts.recursive){
 		searchFolders.forEach((parentFolder) => {
 			forEachPackage(parentFolder, (packageName) => {
-				const stats = zelda(Object.assign(opts, { clean: false, recursive: false, target: path.join(parentFolder, packageName) }));
-
-				traversed += stats.traversed;
-				totalInstalledPackages += stats.totalInstalledPackages;
-				totalPreMappedPackages += stats.totalPreMappedPackages;
-				foundPackageCount += stats.foundPackageCount;
-				symlinkedFileCount += stats.symlinkedFileCount;
-				cleaned += stats.cleaned;
+				updateStats(zelda(Object.assign(opts, { clean: false, recursive: false, target: path.join(parentFolder, packageName) })));
 			});
 		});
 
@@ -291,16 +293,7 @@ module.exports = function zelda(opts = {}){
 			if(!opts.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
 		}
 
-		if(foundPackageLocation !== targetPackageRoot){
-			const stats = zelda(Object.assign(opts, { target: foundPackageLocation }));
-
-			traversed += stats.traversed;
-			totalInstalledPackages += stats.totalInstalledPackages;
-			totalPreMappedPackages += stats.totalPreMappedPackages;
-			foundPackageCount += stats.foundPackageCount;
-			symlinkedFileCount += stats.symlinkedFileCount;
-			cleaned += stats.cleaned;
-		}
+		if(foundPackageLocation !== targetPackageRoot) updateStats(zelda(Object.assign(opts, { target: foundPackageLocation })));
 	});
 
 	symlinkedFileCount += symlinkedFileNames.length;
