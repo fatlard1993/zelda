@@ -26,15 +26,24 @@ Sometimes Link needs a little help from Zelda.
 
 ```
 Options:
-  -h, --help          Show help                                        [boolean]
-  -v, --verbosity     <level>                                       [default: 1]
-  -c, --clean         Clean old symlinks first
-  -i, --install       Force run `npm install` on each package          [boolean]
-  -s, --simulate      See what would happen, without making changes    [boolean]
-  -a, --autoFolders   Automatically detect folders to source modules   [boolean]
-  -p, --parentFolder  <folder> (The top level folder containing all your code)
-  -f, --folder        <folder> (An additional folder to source modules)
-  --ver, --version    Show version number                              [boolean]
+  -h, --help              Show help                                    [boolean]
+  -v, --verbosity         <level>                                   [default: 1]
+  -c, --clean             Clean old symlinks and npm cache first
+  -s, --simulate          See what would happen, without making changes[boolean]
+  -t, --target            <folder> The target package folder (defaults to
+                          process.cwd())
+  -a, --autoFolders       Automatically find projectRoot and detect folders to
+                          source packages              [boolean] [default: true]
+  -p, --projectRoot       <folder> The top level folder containing all your code
+                          (defaults to targetPackage/..)
+  -f, --folder            <folder> An additional folder to source packages
+  -r, --recursive         Recursively walk through and link all local git
+                          projects in the current directory            [boolean]
+  --npmCache              Cache and use remote npm packages as a tarballs in
+                          zelda/temp                                   [boolean]
+  --ver, --version        Show version number                          [boolean]
+  -d, --autoFoldersDepth  <levels> The number of levels to traverse for finding
+                          source folders containing local packages  [default: 2]
 ```
 
 
