@@ -109,19 +109,23 @@ module.exports = function zelda(opts = {}){
 	const simulationVerbosity = opts.simulate ? 0 : 3;
 
 	function rmdir(folder){
-		if(!fs.existsSync(folder)) return;
+		if(!fs.existsSync(folder)) return false;
 
 		log.warn(simulationVerbosity)(`$ rm -rf ${folder}`);
 
 		if(!opts.simulate) fsExtended.rmPattern(folder, /.*/);
+
+		return true;
 	}
 
 	function mkdir(folder){
-		if(fs.existsSync(folder)) return;
+		if(fs.existsSync(folder)) return false;
 
 		log.warn(simulationVerbosity)(`$ mkdir -p ${folder}`);
 
 		if(!opts.simulate) fsExtended.mkdir(folder);
+
+		return true;
 	}
 
 	function spawnPackageManager(args, cwd){
@@ -145,16 +149,28 @@ module.exports = function zelda(opts = {}){
 	const projectRoot = (opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'))) || process.cwd();
 	const rootNodeModules = path.join(projectRoot, 'node_modules');
 
-	log.warn(`\nTargeting: ${targetPackageRoot} .. Using "${rootNodeModules}" to store links\n`);
+	zlog.info(`Targeting: ${targetPackageRoot}`);
+	if(!opts.reRun) zlog.info(`Using "${rootNodeModules}" to store links`);
 
 	let traversed = 0, totalInstalledPackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, symlinkedFileCount = 0, cleaned = 0;
+	let searchFolders = [];
+
+	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
+	if(opts.folder) searchFolders = searchFolders.concat(opts.folder instanceof Array ? opts.folder : [opts.folder]);
+
+	if(!searchFolders.length) return log.error(`No package source folders are configured`);
+
+	if(!opts.reRun){
+		log.info(`Using ${searchFolders.length} folders to search for local packages`);
+		logArr(1, 'searchFolders', searchFolders);
+	}
 
 	function printStats(){
 		let time = (now() - start) / 1000;
 
 		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - (Math.floor(time / 60) * 60)}s`;
 
-		zlog[opts.simulate ? 'warn' : 'info'](`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized ${totalPreMappedPackages} pre-mapped packages .. Found ${foundPackageCount} local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Took ${time}`);
+		zlog[opts.simulate ? 'warn' : 'info'](`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Took ${time}`);
 	}
 
 	function updateStats(stats){
@@ -166,21 +182,15 @@ module.exports = function zelda(opts = {}){
 		cleaned += stats.cleaned;
 	}
 
-	let searchFolders = [];
+	function reRun(newOpts){
+		updateStats(zelda(Object.assign(opts, { reRun: true, fullClean: false, autoFolders: false, folder: searchFolders, projectRoot }, newOpts)));
+	}
 
-	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
-	if(opts.folder) searchFolders = searchFolders.concat(typeof opts.folder === 'object' ? opts.folder : [opts.folder]);
-
-	if(!searchFolders.length) return log.error(`No package source folders are configured`);
-
-	log.info(`Using ${searchFolders.length} folders to search for local packages`);
-	logArr(1, 'searchFolders', searchFolders);
-
-	if(opts.clean){
+	if(!opts.reRun && opts.fullClean){
 		rmdir(rootNodeModules);
 		rmdir(tempCache);
-		rmdir(targetNodeModules);
 	}
+	if(opts.cleanInstall) rmdir(targetNodeModules);
 
 	mkdir(rootNodeModules);
 	mkdir(tempCache);
@@ -188,7 +198,7 @@ module.exports = function zelda(opts = {}){
 
 	if(opts.target instanceof Array){
 		opts.target.forEach((name) => {
-			updateStats(zelda(Object.assign(opts, { clean: false, recursive: false, target: path.resolve(projectRoot, name) })));
+			reRun({ target: path.resolve(projectRoot, name) });
 		});
 
 		printStats();
@@ -198,8 +208,8 @@ module.exports = function zelda(opts = {}){
 
 	if(opts.recursive){
 		searchFolders.forEach((parentFolder) => {
-			forEachPackage(parentFolder, (packageName) => {
-				updateStats(zelda(Object.assign(opts, { clean: false, recursive: false, target: path.join(parentFolder, packageName) })));
+			forEachPackage(parentFolder, (name) => {
+				reRun({ target: path.resolve(parentFolder, name), recursive: false });
 			});
 		});
 
@@ -234,8 +244,8 @@ module.exports = function zelda(opts = {}){
 		return foundPackage;
 	}
 
-	logArr(2, 'targetPackageDependencyNames', targetPackageDependencyNames);
-	if(!opts.clean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
+	if(targetPackageDependencyNames.length) logArr(2, 'targetPackageDependencyNames', targetPackageDependencyNames);
+	if(!opts.fullClean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
 	if(opts.npmCache && tempCacheNames.length) logArr(2, 'tempCacheNames', tempCacheNames);
 
 	targetPackageDependencyNames.forEach((name) => {
@@ -253,12 +263,12 @@ module.exports = function zelda(opts = {}){
 	const dependenciesToInstallCount = dependenciesToInstall.length;
 
 	if(dependenciesToInstallCount){
-		log.info(`Installing ${dependenciesToInstallCount} packages for ${targetPackageRoot}`);
+		log.info(`Installing ${dependenciesToInstallCount} remote packages for ${targetPackageRoot}`);
 		logArr(1, 'dependenciesToInstall', dependenciesToInstall);
 
 		totalInstalledPackages += dependenciesToInstallCount;
 
-		spawnPackageManager(['i', '--silent', '--no-save'].concat(dependenciesToInstall), targetPackageRoot);
+		spawnPackageManager(['i', '--silent', '--no-save', `--cache=${tempCache}`].concat(dependenciesToInstall), targetPackageRoot);
 
 		if(opts.npmCache){
 			dependenciesToInstall.forEach((name) => {
@@ -289,9 +299,9 @@ module.exports = function zelda(opts = {}){
 
 		++traversed;
 
-		rmdir(path.join(targetPackageRoot, 'node_modules', name));
+		const cleanedReference = rmdir(path.join(targetNodeModules, name));
 
-		++cleaned;
+		if(cleanedReference) ++cleaned;
 
 		if(!fs.existsSync(path.join(rootNodeModules, name))){
 			log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
@@ -302,8 +312,14 @@ module.exports = function zelda(opts = {}){
 
 			if(!opts.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
 		}
+	});
 
-		if(foundPackageLocation !== targetPackageRoot) updateStats(zelda(Object.assign(opts, { target: foundPackageLocation })));
+	foundPackageNames.forEach((name) => {
+		const foundPackageLocation = foundPackages[name];
+
+		++traversed;
+
+		if(foundPackageLocation !== targetPackageRoot) reRun({ target: foundPackageLocation });
 	});
 
 	symlinkedFileCount += symlinkedFileNames.length;

@@ -10,7 +10,8 @@ yargs.alias({
 	h: 'help',
 	ver: 'version',
 	v: 'verbosity',
-	c: 'clean',
+	c: 'cleanInstall',
+	C: 'fullClean',
 	s: 'simulate',
 	t: 'target',
 	a: 'autoFolders',
@@ -20,7 +21,7 @@ yargs.alias({
 	r: 'recursive'
 });
 
-yargs.boolean(['h', 'ver', 'i', 's', 'a', 'r', 'npmCache']);
+yargs.boolean(['h', 'ver', 'C', 's', 'a', 'r', 'npmCache']);
 
 //todo support saving different defaults
 yargs.default({
@@ -32,11 +33,12 @@ yargs.default({
 yargs.describe({
 	h: 'This',
 	v: '<level>',
-	c: 'Clean old symlinks and npm cache first',
+	c: 'Clean old node_modules before installing',
+	C: 'Clean old symlinks and npm cache first',
 	s: 'See what would happen, without making changes',
 	t: '<folder> The target package folder(s) (defaults to process.cwd())',
 	a: 'Automatically find projectRoot and detect folders to source packages',
-	autoFoldersDepth: '<levels> The number of levels to traverse for finding source folders containing local packages',
+	d: '<levels> The number of levels to traverse for finding source folders containing local packages',
 	p: '<folder> The top level folder containing all your code (defaults to targetPackage/..)',
 	f: '<folder> Additional folder(s) to source packages',
 	r: 'Recursively walk through and link all local git projects in the current source folders',
@@ -45,7 +47,7 @@ yargs.describe({
 
 const args = yargs.argv;
 
-['_', '$0', 'v', 'c', 's', 't', 'a', 'd', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
+['_', '$0', 'v', 'c', 'C', 's', 't', 'a', 'd', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
 
 const opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
 

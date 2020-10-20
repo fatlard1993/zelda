@@ -29,12 +29,15 @@ Sometimes Link needs a little help from Zelda.
 Options:
   -h, --help              Show help                                    [boolean]
   -v, --verbosity         <level>                                   [default: 1]
-  -c, --clean             Clean old symlinks and npm cache first
+  -c, --cleanInstall      Clean old node_modules before installing
+  -C, --fullClean         Clean old symlinks and npm cache first       [boolean]
   -s, --simulate          See what would happen, without making changes[boolean]
   -t, --target            <folder> The target package folder(s) (defaults to
                           process.cwd())
   -a, --autoFolders       Automatically find projectRoot and detect folders to
                           source packages              [boolean] [default: true]
+  -d, --autoFoldersDepth  <levels> The number of levels to traverse for finding
+                          source folders containing local packages  [default: 2]
   -p, --projectRoot       <folder> The top level folder containing all your code
                           (defaults to targetPackage/..)
   -f, --folder            <folder> Additional folder(s) to source packages
@@ -43,8 +46,6 @@ Options:
       --npmCache          Cache and use remote npm packages as a tarballs in
                           zelda/temp                                   [boolean]
       --ver, --version    Show version number                          [boolean]
-  -d, --autoFoldersDepth  <levels> The number of levels to traverse for finding
-                          source folders containing local packages  [default: 2]
 ```
 
 
