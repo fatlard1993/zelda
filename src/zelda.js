@@ -141,7 +141,9 @@ module.exports = function zelda(opts = {}){
 	function logArr(verbosity, label, arr){ log.info(verbosity)(`\n[[${label}]]\n ┣ ${arr.join('\n ┣ ')}\n`); }
 
 	const start = now();
-	const tempCache = path.join(findRoot(__dirname), 'temp/cache');
+	const tempFolder = path.join(findRoot(__dirname), 'temp');
+	const tempCache = path.join(tempFolder, 'cache');
+	const npmCache = path.join(tempFolder, 'npmCache');
 
 	const targetPackageRoot = opts.recursive ? process.cwd() : (opts.target instanceof Array ? process.cwd() : findRoot(opts.target || process.cwd()));
 	const targetNodeModules = opts.recursive ? undefined : path.join(targetPackageRoot, 'node_modules');
@@ -199,12 +201,13 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 
 	if(!opts.reRun && opts.fullClean){
 		rmdir(rootNodeModules);
-		rmdir(tempCache);
+		rmdir(tempFolder);
 	}
 	if(opts.cleanInstall) rmdir(targetNodeModules);
 
 	mkdir(rootNodeModules);
 	mkdir(tempCache);
+	mkdir(npmCache);
 	mkdir(targetNodeModules);
 
 	if(opts.target instanceof Array){
@@ -285,7 +288,7 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 		log.info(`Installing ${dependenciesToInstallCount} remote package${dependenciesToInstallCount > 1 ? 's' : ''} for ${targetPackageRoot}`);
 		logArr(1, 'dependenciesToInstall', dependenciesToInstall);
 
-		spawnPackageManager(['i', '--silent', '--no-save', `--cache=${tempCache}`].concat(dependenciesToInstall), targetPackageRoot);
+		spawnPackageManager(['i', '--silent', '--no-save', `--cache=${npmCache}`].concat(dependenciesToInstall), targetPackageRoot);
 
 		if(opts.npmCache){
 			dependenciesToInstall.forEach((name) => {
@@ -293,7 +296,7 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 
 				log.info(`Caching ${name}`);
 
-				var installResult = spawnPackageManager(['pack', '--silent', name], path.join(tempCache));
+				var installResult = spawnPackageManager(['pack', '--silent', name], tempCache);
 
 				log.warn(installResult.status === 0 ? 2 : 0)('Pack install result', installResult);
 
