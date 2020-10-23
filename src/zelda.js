@@ -62,17 +62,16 @@ function folderContainsPackages(parentFolder){
 }
 
 function findProjectRoot(targetFolder){
-	if(targetFolder === os.homedir()) return log.error('Could not find project root');
+	if(targetFolder === os.homedir()) return log.error(`Could not find a project root folder above ${targetFolder}`);
 
 	let projectRoot;
 	const parentFolder = path.resolve(targetFolder, '..');
-	const grandparentFolder = path.resolve(parentFolder, '..');
 
-	var parentContainPackages = folderContainsPackages(parentFolder), grandparentContainsPackages = folderContainsPackages(grandparentFolder);
+	var targetContainPackages = folderContainsPackages(targetFolder), parentContainPackages = folderContainsPackages(parentFolder);
 
-	log.info(4)(parentFolder, parentContainPackages, grandparentFolder, grandparentContainsPackages);
+	log.info(4)(targetFolder, targetContainPackages, parentFolder, parentContainPackages);
 
-	if(parentContainPackages && !grandparentContainsPackages) projectRoot = parentFolder;
+	if(targetContainPackages && !parentContainPackages) projectRoot = targetFolder;
 
 	if(!projectRoot) projectRoot = findProjectRoot(parentFolder);
 
@@ -144,15 +143,15 @@ module.exports = function zelda(opts = {}){
 	const start = now();
 	const tempCache = path.join(findRoot(__dirname), 'temp/cache');
 
-	const targetPackageRoot =  opts.target instanceof Array ? process.cwd() : findRoot(opts.target || process.cwd());
-	const targetNodeModules = path.join(targetPackageRoot, 'node_modules');
+	const targetPackageRoot = opts.recursive ? process.cwd() : (opts.target instanceof Array ? process.cwd() : findRoot(opts.target || process.cwd()));
+	const targetNodeModules = opts.recursive ? undefined : path.join(targetPackageRoot, 'node_modules');
 	const projectRoot = (opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'))) || process.cwd();
 	const rootNodeModules = path.join(projectRoot, 'node_modules');
 
-	zlog.info(`Targeting: ${targetPackageRoot}`);
-	if(!opts.reRun) zlog.info(`Using "${rootNodeModules}" to store links`);
+	zlog.info(opts.recursive ? 1 : 0)(`Targeting: ${opts.recursive ? projectRoot : targetPackageRoot}`);
+	if(!opts.recursive && !opts.reRun) zlog.info(`Using "${rootNodeModules}" to store links`);
 
-	let traversed = 0, totalInstalledPackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, symlinkedFileCount = 0, cleaned = 0;
+	let traversed = 0, totalInstalledPackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, symlinkedFileCount = 0, cleaned = 0, recursivelyRan = 0;
 	let searchFolders = [];
 
 	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
@@ -170,7 +169,7 @@ module.exports = function zelda(opts = {}){
 
 		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - (Math.floor(time / 60) * 60)}s`;
 
-		zlog[opts.simulate ? 'warn' : 'info'](`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Took ${time}`);
+		zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
 	}
 
 	function updateStats(stats){
@@ -183,7 +182,7 @@ module.exports = function zelda(opts = {}){
 	}
 
 	function reRun(newOpts){
-		updateStats(zelda(Object.assign(opts, { reRun: true, fullClean: false, autoFolders: false, folder: searchFolders, projectRoot }, newOpts)));
+		updateStats(zelda(Object.assign(opts, { reRun: true, fullClean: false, recursive: false, autoFolders: false, folder: searchFolders, projectRoot }, newOpts)));
 	}
 
 	if(!opts.reRun && opts.fullClean){
@@ -209,7 +208,9 @@ module.exports = function zelda(opts = {}){
 	if(opts.recursive){
 		searchFolders.forEach((parentFolder) => {
 			forEachPackage(parentFolder, (name) => {
-				reRun({ target: path.resolve(parentFolder, name), recursive: false });
+				++recursivelyRan;
+
+				reRun({ target: path.resolve(parentFolder, name) });
 			});
 		});
 
