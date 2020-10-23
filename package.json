@@ -22,7 +22,7 @@
 	},
 	"devDependencies": {
 		"babel-eslint": "^10.1.0",
-		"eslint": "^6.8.0",
+		"eslint": "^7.11.0",
 		"eslint-config-rules": "github:fatlard1993/eslint-config-rules"
 	},
 	"dependencies": {
@@ -30,6 +30,6 @@
 		"fs-extended": "github:fatlard1993/fs-extended",
 		"find-root": "^1.1.0",
 		"performance-now": "^2.1.0",
-		"yargs": "^15.3.1"
+		"yargs": "^16.1.0"
 	}
 }

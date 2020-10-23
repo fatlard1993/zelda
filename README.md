@@ -80,3 +80,6 @@ zelda -a
 Gone are the days of running tons of `npm link` commands by hand!
 
 ![link with zelda](./img/link_with_zelda.jpg)
+
+add npmcache stats
+make stats cleaner/simpler

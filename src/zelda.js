@@ -148,10 +148,10 @@ module.exports = function zelda(opts = {}){
 	const projectRoot = (opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'))) || process.cwd();
 	const rootNodeModules = path.join(projectRoot, 'node_modules');
 
-	zlog.info(opts.recursive ? 1 : 0)(`Targeting: ${opts.recursive ? projectRoot : targetPackageRoot}`);
+	zlog.info(opts.recursive ? 0 : 1)(`Targeting: ${opts.recursive ? projectRoot : targetPackageRoot}`);
 	if(!opts.recursive && !opts.reRun) zlog.info(`Using "${rootNodeModules}" to store links`);
 
-	let traversed = 0, totalInstalledPackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, symlinkedFileCount = 0, cleaned = 0, recursivelyRan = 0;
+	let traversed = 0, installedRemotePackages = 0, totalPreMappedPackages = 0, foundPackageCount = 0, createdSymlinks = 0, cleanedReferences = 0, recursivelyRan = 0, newCache = 0, usedCache = 0;
 	let searchFolders = [];
 
 	if(opts.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, opts.autoFoldersDepth));
@@ -169,16 +169,28 @@ module.exports = function zelda(opts = {}){
 
 		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - (Math.floor(time / 60) * 60)}s`;
 
-		zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${totalInstalledPackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${symlinkedFileCount} symlinks .. Cleaned ${cleaned} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
+		// zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${installedRemotePackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${createdSymlinks} symlinks .. Cleaned ${cleanedReferences} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
+		zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done${opts.recursive ? '' : ' with '+ targetPackageRoot} Took ${time}
+Traversed ${traversed} folders
+Installed ${installedRemotePackages} remote packages
+Utilized pre-mapped packages in ${totalPreMappedPackages} places
+Found ${foundPackageCount} local packages
+Created ${createdSymlinks} symlinks
+Cleaned ${cleanedReferences} references
+Cached ${newCache} new npm packages
+Utilized ${usedCache} cached npm packages
+Recursively ran zelda for ${recursivelyRan} local packages`);
 	}
 
 	function updateStats(stats){
 		traversed += stats.traversed;
-		totalInstalledPackages += stats.totalInstalledPackages;
+		installedRemotePackages += stats.installedRemotePackages;
 		totalPreMappedPackages += stats.totalPreMappedPackages;
 		foundPackageCount += stats.foundPackageCount;
-		symlinkedFileCount += stats.symlinkedFileCount;
-		cleaned += stats.cleaned;
+		createdSymlinks += stats.createdSymlinks;
+		cleanedReferences += stats.cleanedReferences;
+		newCache += stats.newCache;
+		usedCache += stats.usedCache;
 	}
 
 	function reRun(newOpts){
@@ -249,8 +261,12 @@ module.exports = function zelda(opts = {}){
 	if(!opts.fullClean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
 	if(opts.npmCache && tempCacheNames.length) logArr(2, 'tempCacheNames', tempCacheNames);
 
+	const installedModules = Object.fromEntries(fs.readdirSync(targetNodeModules).map((item) => { return [item, 1]; }));
+
 	targetPackageDependencyNames.forEach((name) => {
 		if(preMappedPackages[name]) return ++totalPreMappedPackages;
+
+		if(findLocalCopy(name) || installedModules[name]) return;
 
 		if(opts.npmCache){
 			const tarCacheFile = tempCacheNames.filter((tarName) => { return new RegExp(`.*\\b${name}\\b.*\\.tgz`).test(tarName); })[0];
@@ -258,22 +274,22 @@ module.exports = function zelda(opts = {}){
 			if(tarCacheFile) return dependenciesToInstall.push(path.join(tempCache, tarCacheFile));
 		}
 
-		if(!findLocalCopy(name)) dependenciesToInstall.push(name);
+		++installedRemotePackages;
+
+		dependenciesToInstall.push(name);
 	});
 
 	const dependenciesToInstallCount = dependenciesToInstall.length;
 
 	if(dependenciesToInstallCount){
-		log.info(`Installing ${dependenciesToInstallCount} remote packages for ${targetPackageRoot}`);
+		log.info(`Installing ${dependenciesToInstallCount} remote package${dependenciesToInstallCount > 1 ? 's' : ''} for ${targetPackageRoot}`);
 		logArr(1, 'dependenciesToInstall', dependenciesToInstall);
-
-		totalInstalledPackages += dependenciesToInstallCount;
 
 		spawnPackageManager(['i', '--silent', '--no-save', `--cache=${tempCache}`].concat(dependenciesToInstall), targetPackageRoot);
 
 		if(opts.npmCache){
 			dependenciesToInstall.forEach((name) => {
-				if(name.endsWith('.tgz')) return;
+				if(name.endsWith('.tgz')) return (++usedCache);
 
 				log.info(`Caching ${name}`);
 
@@ -282,6 +298,8 @@ module.exports = function zelda(opts = {}){
 				log.warn(installResult.status === 0 ? 2 : 0)('Pack install result', installResult);
 
 				if(installResult.status !== 0) log.warn(`Unable to pack ${name}`);
+
+				else ++newCache;
 			});
 		}
 	}
@@ -302,7 +320,7 @@ module.exports = function zelda(opts = {}){
 
 		const cleanedReference = rmdir(path.join(targetNodeModules, name));
 
-		if(cleanedReference) ++cleaned;
+		if(cleanedReference) ++cleanedReferences;
 
 		if(!fs.existsSync(path.join(rootNodeModules, name))){
 			log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
@@ -315,19 +333,27 @@ module.exports = function zelda(opts = {}){
 		}
 	});
 
+	const alreadyRan = {};
+
 	foundPackageNames.forEach((name) => {
+		if(alreadyRan[name]) return;
+
 		const foundPackageLocation = foundPackages[name];
 
 		++traversed;
 
-		if(foundPackageLocation !== targetPackageRoot) reRun({ target: foundPackageLocation });
+		if(foundPackageLocation !== targetPackageRoot){
+			reRun({ target: foundPackageLocation });
+
+			alreadyRan[name] = true;
+		}
 	});
 
-	symlinkedFileCount += symlinkedFileNames.length;
+	createdSymlinks += symlinkedFileNames.length;
 
-	if(symlinkedFileCount) logArr(1, 'symlinkedFileNames', symlinkedFileNames);
+	if(createdSymlinks) logArr(1, 'symlinkedFileNames', symlinkedFileNames);
 
 	printStats();
 
-	return { traversed, totalInstalledPackages, totalPreMappedPackages, foundPackageCount, symlinkedFileCount, cleaned };
+	return { traversed, installedRemotePackages, totalPreMappedPackages, foundPackageCount, createdSymlinks, cleanedReferences, newCache, usedCache };
 };
