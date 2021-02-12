@@ -144,8 +144,18 @@ module.exports = function zelda(opts = {}){
 	const tempFolder = path.join(findRoot(__dirname), 'temp');
 	const tempCache = path.join(tempFolder, 'cache');
 	const npmCache = path.join(tempFolder, 'npmCache');
+	const cwd = process.cwd();
 
-	const targetPackageRoot = opts.recursive ? process.cwd() : (opts.target instanceof Array ? process.cwd() : findRoot(opts.target || process.cwd()));
+	if(!opts.recursive && !opts.target){
+		try{ findRoot(cwd); }
+		catch(err){
+			zlog.info('No target specified .. No single git project found .. Attempting recursive mode');
+
+			opts.recursive = true;
+		}
+	}
+
+	const targetPackageRoot = opts.recursive ? cwd : (opts.target instanceof Array ? cwd : findRoot(opts.target || cwd));
 	const targetNodeModules = opts.recursive ? undefined : path.join(targetPackageRoot, 'node_modules');
 	const projectRoot = (opts.projectRoot ? path.resolve(opts.projectRoot) : (opts.autoFolders ? findProjectRoot(targetPackageRoot) : path.resolve(targetPackageRoot, '..'))) || process.cwd();
 	const rootNodeModules = path.join(projectRoot, 'node_modules');
