@@ -235,7 +235,7 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 	}
 
 	const targetPackageJSON = require(path.join(targetPackageRoot, 'package.json'));
-	const targetPackageDependencyNames = Object.keys(Object.assign(targetPackageJSON.dependencies, targetPackageJSON.devDependencies) || {});
+	const targetPackageDependencyNames = Object.keys(Object.assign(targetPackageJSON.dependencies || {}, targetPackageJSON.devDependencies || {}) || {});
 	const preMappedPackageNames = fs.readdirSync(rootNodeModules);
 	const preMappedPackages = Object.fromEntries(preMappedPackageNames.map((item) => { return [item, 1]; }));
 	const tempCacheNames = fs.readdirSync(tempCache) || [];
