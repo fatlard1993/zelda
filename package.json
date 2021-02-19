@@ -17,13 +17,8 @@
 		"url": "https://github.com/fatlard1993/zelda/issues"
 	},
 	"homepage": "https://github.com/fatlard1993/zelda#readme",
-	"eslintConfig": {
-		"extends": "rules"
-	},
 	"devDependencies": {
-		"babel-eslint": "^10.1.0",
-		"eslint": "^7.11.0",
-		"eslint-config-rules": "github:fatlard1993/eslint-config-rules"
+		"eslint": "^7.11.0"
 	},
 	"dependencies": {
 		"log": "github:fatlard1993/log#3.x.x",
