@@ -206,10 +206,10 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 	}
 
 	function reRun(newOpts){
-		updateStats(zelda(Object.assign(opts, { reRun: true, fullClean: false, recursive: false, autoFolders: false, folder: searchFolders, projectRoot }, newOpts)));
+		updateStats(zelda(Object.assign(opts, { reRun: true, preclean: false, recursive: false, autoFolders: false, folder: searchFolders, projectRoot }, newOpts)));
 	}
 
-	if(!opts.reRun && opts.fullClean){
+	if(!opts.reRun && opts.preclean){
 		rmdir(rootNodeModules);
 		rmdir(tempFolder);
 	}
@@ -271,7 +271,7 @@ Recursively ran zelda for ${recursivelyRan} local packages`);
 	}
 
 	if(targetPackageDependencyNames.length) logArr(2, 'targetPackageDependencyNames', targetPackageDependencyNames);
-	if(!opts.fullClean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
+	if(!opts.preclean) logArr(2, 'preMappedPackageNames', preMappedPackageNames);
 	if(opts.npmCache && tempCacheNames.length) logArr(2, 'tempCacheNames', tempCacheNames);
 
 	const installedModules = Object.fromEntries(fs.readdirSync(targetNodeModules).map((item) => { return [item, 1]; }));

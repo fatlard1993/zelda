@@ -18,13 +18,13 @@
 	},
 	"homepage": "https://github.com/fatlard1993/zelda#readme",
 	"devDependencies": {
-		"eslint": "^7.11.0"
+		"eslint": "^7.24.0"
 	},
 	"dependencies": {
-		"log": "github:fatlard1993/log#3.x.x",
-		"fs-extended": "github:fatlard1993/fs-extended",
+		"argi": "github:fatlard1993/argi",
 		"find-root": "^1.1.0",
-		"performance-now": "^2.1.0",
-		"yargs": "^16.1.0"
+		"fs-extended": "github:fatlard1993/fs-extended",
+		"log": "github:fatlard1993/log#3.x.x",
+		"performance-now": "^2.1.0"
 	}
 }
