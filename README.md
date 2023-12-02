@@ -4,50 +4,78 @@
 
 Sometimes Link needs a little help from Zelda.
 
-
 ## Features
 
 - Automatically `npm link` all your local packages together
-- Recursively run `npm install` on all local packages
-- A simple cache method built on `npm pack` for quicker consecutive installs of remote packages
-
+- Recursively run `bun install` on all local packages
 
 ## Usage
 
 1. Install it globally.
 
-`npm install -g fatlard1993/zelda`
+`bun install -g fatlard1993/zelda`
 
 2. Run `zelda` from your node project directory. For example:
 
 ~/Projects/my-awesome-project$ `zelda`
 
-
 ### Options
 
 ```
-Options:
-  -h, --help              Show help                                    [boolean]
-  -v, --verbosity         <level>                                   [default: 1]
-  -c, --cleanInstall      Clean old node_modules before installing
-  -C, --fullClean         Clean old symlinks and npm cache first       [boolean]
-  -s, --simulate          See what would happen, without making changes[boolean]
-  -t, --target            <folder> The target package folder(s) (defaults to
-                          process.cwd())
-  -a, --autoFolders       Automatically find projectRoot and detect folders to
-                          source packages              [boolean] [default: true]
-  -d, --autoFoldersDepth  <levels> The number of levels to traverse for finding
-                          source folders containing local packages  [default: 2]
-  -p, --projectRoot       <folder> The top level folder containing all your code
-                          (defaults to targetPackage/..)
-  -f, --folder            <folder> Additional folder(s) to source packages
-  -r, --recursive         Recursively walk through and link all local git
-                          projects in the current source folders       [boolean]
-      --npmCache          Cache and use remote npm packages as a tarballs in
-                          zelda/temp                                   [boolean]
-      --ver, --version    Show version number                          [boolean]
-```
+[zelda] Version: 2.4.0
 
+Usage:
+
+zelda [[--help|-h|-?] | [--version] | [--verbosity|-v <number>] | [--cleanInstall|-c] | [--preclean|-C] | [--simulate|-s] | [--target|-t <string>] | [--autoFolders|-a] | [--autoFoldersDepth|-d <number>] | [--projectRoot|-p <string>] | [--folder|-f <string>] | [--recursive|-r]]
+
+
+Flags:
+
+--help, -h, -?
+	[boolean]
+
+--version
+	[boolean]
+
+--verbosity, -v
+	[number :: 1]
+
+--cleanInstall, -c
+	[boolean]
+	Clean old node_modules before installing
+
+--preclean, -C
+	[boolean]
+	Clean old symlinks first
+
+--simulate, -s
+	[boolean]
+	See what would happen, without making changes
+
+--target, -t
+	[string]
+	<folder> The target package folder(s) (defaults to process.cwd())
+
+--autoFolders, -a
+	[boolean :: true]
+	Automatically find projectRoot and detect folders to source packages
+
+--autoFoldersDepth, -d
+	[number :: 2]
+	<levels> The number of levels to traverse for finding source folders containing local packages
+
+--projectRoot, -p
+	[string]
+	<folder> The top level folder containing all your code (defaults to targetPackage/..)
+
+--folder, -f
+	[string]
+	<folder> Additional folder(s) to source packages
+
+--recursive, -r
+	[boolean]
+	Recursively walk through and link all local git projects in the current source folders
+```
 
 ### Example
 
@@ -74,12 +102,8 @@ cd ~/Projects/webtorrent
 zelda -a
 ```
 
-
 ## Link is better with Zelda
 
 Gone are the days of running tons of `npm link` commands by hand!
 
 ![link with zelda](./img/link_with_zelda.jpg)
-
-add npmcache stats
-make stats cleaner/simpler

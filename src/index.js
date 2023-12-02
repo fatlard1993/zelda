@@ -1,58 +1,71 @@
-#!/usr/bin/env node
+import argi from 'argi';
+import Log from 'log';
 
-const yargs = require('yargs');
+import zelda from './zelda';
 
-yargs.parserConfiguration({
-	'camel-case-expansion': false
+argi.defaults.type = 'boolean';
+
+const { options } = argi.parse({
+	verbosity: {
+		type: 'number',
+		defaultValue: 1,
+		alias: 'v',
+	},
+	cleanInstall: {
+		description: 'Clean old node_modules before installing',
+		alias: 'c',
+	},
+	preclean: {
+		description: 'Clean old symlinks first',
+		defaultValue: true,
+		alias: 'C',
+	},
+	simulate: {
+		description: 'See what would happen, without making changes',
+		alias: 's',
+	},
+	target: {
+		type: 'string',
+		description: '<folder> The target package folder(s) (defaults to process.cwd())',
+		alias: 't',
+	},
+	autoFolders: {
+		description: 'Automatically find projectRoot and detect folders to source packages',
+		defaultValue: true,
+		alias: 'a',
+	},
+	autoFoldersDepth: {
+		type: 'number',
+		description: '<levels> The number of levels to traverse for finding source folders containing local packages',
+		defaultValue: 2,
+		alias: 'd',
+	},
+	projectRoot: {
+		type: 'string',
+		description: '<folder> The top level folder containing all your code (defaults to targetPackage/..)',
+		alias: 'p',
+	},
+	folder: {
+		type: 'string',
+		description: '<folder> Additional folder(s) to source packages',
+		transform: value => {
+			return argi.options.folder ? argi.options.folder.concat(value) : [value];
+		},
+		alias: 'f',
+	},
+	recursive: {
+		description: 'Recursively walk through and link all local git projects in the current source folders',
+		alias: 'r',
+	},
+	packageManager: {
+		type: 'string',
+		description: '<packageManager> The package manager to use (defaults to bun)',
+		alias: 'pm',
+	},
 });
 
-yargs.alias({
-	h: 'help',
-	ver: 'version',
-	v: 'verbosity',
-	c: 'cleanInstall',
-	C: 'fullClean',
-	s: 'simulate',
-	t: 'target',
-	a: 'autoFolders',
-	d: 'autoFoldersDepth',
-	p: 'projectRoot',
-	f: 'folder',
-	r: 'recursive'
-});
+const log = new Log({ tag: 'zelda', color: true, verbosity: options.verbosity });
 
-yargs.boolean(['h', 'ver', 'C', 's', 'a', 'r', 'npmCache']);
+log(2)('Options', options);
 
-//todo support saving different defaults
-yargs.default({
-	v: 1,
-	a: true,
-	d: 2
-});
-
-yargs.describe({
-	h: 'This',
-	v: '<level>',
-	c: 'Clean old node_modules before installing',
-	C: 'Clean old symlinks and npm cache first',
-	s: 'See what would happen, without making changes',
-	t: '<folder> The target package folder(s) (defaults to process.cwd())',
-	a: 'Automatically find projectRoot and detect folders to source packages',
-	d: '<levels> The number of levels to traverse for finding source folders containing local packages',
-	p: '<folder> The top level folder containing all your code (defaults to targetPackage/..)',
-	f: '<folder> Additional folder(s) to source packages',
-	r: 'Recursively walk through and link all local git projects in the current source folders',
-	npmCache: 'Cache and use remote npm packages as a tarballs in zelda/temp'
-});
-
-const args = yargs.argv;
-
-['_', '$0', 'v', 'c', 'C', 's', 't', 'a', 'd', 'p', 'f', 'r'].forEach((item) => { delete args[item]; });
-
-const opts = Object.assign(args, { args: Object.assign({}, args), verbosity: Number(args.verbosity) });
-
-const log = new (require('log'))({ tag: 'zelda', color: true, verbosity: opts.verbosity });
-
-log(1)('Options', opts);
-
-require('./zelda')(opts);
+zelda(options);
