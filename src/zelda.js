@@ -99,7 +99,7 @@ const zelda = (options = {}) => {
 		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - Math.floor(time / 60) * 60}s`;
 
 		// zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Found ${missingRemotePackages} missing packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${createdSymlinks} symlinks .. Cleaned ${cleanedReferences} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
-		log[options.simulate ? 'warn' : 'info'](options.reRun ? 1 : 0)(`${options.simulate ? '[simulate] ' : ''}Done${
+		log[options.simulate ? 'simulate' : 'info'](`Done${
 			options.recursive ? '' : ' with ' + targetPackageRoot
 		} Took ${time}
 Traversed ${traversed} folders
@@ -142,8 +142,6 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 			reRun({ target: path.resolve(projectRoot, name) });
 		});
 
-		printStats();
-
 		return;
 	}
 
@@ -155,8 +153,6 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 				reRun({ target: path.resolve(parentFolder, name) });
 			});
 		});
-
-		printStats();
 
 		return;
 	}
@@ -237,22 +233,6 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 			log.simulation(simulationVerbosity)(`cd ${rootNodeModules} && ln -s ${foundPackageLocation} ${name}`);
 
 			if (!options.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
-		}
-	});
-
-	const alreadyRan = {};
-
-	foundPackageNames.forEach(name => {
-		if (alreadyRan[name]) return;
-
-		const foundPackageLocation = foundPackages[name];
-
-		++traversed;
-
-		if (foundPackageLocation !== targetPackageRoot) {
-			reRun({ target: foundPackageLocation });
-
-			alreadyRan[name] = true;
 		}
 	});
 
