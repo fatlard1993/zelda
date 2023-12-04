@@ -1,44 +1,44 @@
 {
-	"name": "zelda",
-	"version": "2.6.0",
-	"description": "Local development package link manager.",
-	"main": "src/index.js",
-	"bin": "src/index.js",
-	"scripts": {
-		"start": "bun run src/index.js",
-		"lint": "bun --bun eslint --ext .js .",
-		"lint:fix": "bun --bun eslint --fix --ext .js .",
-		"pretty": "bun --bun prettier .",
-		"pretty:fix": "bun --bun prettier --write .",
-		"fix": "bun run lint:fix ; bun run pretty:fix"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/fatlard1993/zelda.git"
-	},
-	"author": "feross, fatlard1993",
-	"license": "ISC",
-	"bugs": {
-		"url": "https://github.com/fatlard1993/zelda/issues"
-	},
-	"homepage": "https://github.com/fatlard1993/zelda#readme",
-	"dependencies": {
-		"argi": "github:fatlard1993/argi#564193c",
-		"find-root": "^1.1.0",
-		"log": "github:fatlard1993/log#e4cb364",
-		"performance-now": "^2.1.0"
-	},
-	"devDependencies": {
-		"bun-types": "^1.0.14",
-		"eslint": "^8.55.0",
-		"eslint-config-prettier": "^9.0.0",
-		"eslint-plugin-compat": "^4.2.0",
-		"eslint-plugin-import": "^2.29.0",
-		"eslint-plugin-prettier": "^5.0.1",
-		"eslint-plugin-spellcheck": "0.0.20",
-		"eslint-plugin-testing-library": "^6.2.0",
-		"eslint-plugin-unicorn": "^49.0.0",
-		"eslint-plugin-write-good-comments": "^0.2.0",
-		"prettier": "3.1.0"
-	}
+  "name": "zelda",
+  "version": "2.6.0",
+  "description": "Local development package link manager.",
+  "main": "src/index.js",
+  "bin": "src/index.js",
+  "scripts": {
+    "start": "bun run src/index.js",
+    "lint": "bun --bun eslint --ext .js .",
+    "lint:fix": "bun --bun eslint --fix --ext .js .",
+    "pretty": "bun --bun prettier .",
+    "pretty:fix": "bun --bun prettier --write .",
+    "fix": "bun run lint:fix ; bun run pretty:fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatlard1993/zelda.git"
+  },
+  "author": "feross, fatlard1993",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fatlard1993/zelda/issues"
+  },
+  "homepage": "https://github.com/fatlard1993/zelda#readme",
+  "dependencies": {
+    "argi": "github:fatlard1993/argi#e3f79c8",
+    "find-root": "^1.1.0",
+    "log": "github:fatlard1993/log#e4cb364",
+    "performance-now": "^2.1.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.0.14",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-compat": "^4.2.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "eslint-plugin-spellcheck": "0.0.20",
+    "eslint-plugin-testing-library": "^6.2.0",
+    "eslint-plugin-unicorn": "^49.0.0",
+    "eslint-plugin-write-good-comments": "^0.2.0",
+    "prettier": "3.1.0"
+  }
 }

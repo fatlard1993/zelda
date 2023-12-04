@@ -1,8 +1,11 @@
 import argi from 'argi';
 import Log from 'log';
 
+import packageJSON from '../package.json';
+
 import zelda from './zelda';
 
+argi.package = packageJSON;
 argi.defaults.type = 'boolean';
 
 const { options } = argi.parse({
@@ -10,10 +13,6 @@ const { options } = argi.parse({
 		type: 'number',
 		defaultValue: 1,
 		alias: 'v',
-	},
-	cleanInstall: {
-		description: 'Clean old node_modules before installing',
-		alias: 'c',
 	},
 	preclean: {
 		description: 'Clean old symlinks first',
@@ -26,7 +25,8 @@ const { options } = argi.parse({
 	},
 	target: {
 		type: 'string',
-		description: '<folder> The target package folder(s) (defaults to process.cwd())',
+		description: '<folder> The target package folder(s)',
+		defaultValue: process.cwd(),
 		alias: 't',
 	},
 	autoFolders: {
@@ -42,7 +42,7 @@ const { options } = argi.parse({
 	},
 	projectRoot: {
 		type: 'string',
-		description: '<folder> The top level folder containing all your code (defaults to targetPackage/..)',
+		description: '<folder> The top level folder containing all your code (defaults to target/..)',
 		alias: 'p',
 	},
 	folder: {
@@ -56,11 +56,6 @@ const { options } = argi.parse({
 	recursive: {
 		description: 'Recursively walk through and link all local git projects in the current source folders',
 		alias: 'r',
-	},
-	packageManager: {
-		type: 'string',
-		description: '<packageManager> The package manager to use (defaults to bun)',
-		alias: 'pm',
 	},
 });
 

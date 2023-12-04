@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import childProcess from 'child_process';
 
 import Log from 'log';
 import findRoot from 'find-root';
@@ -39,14 +38,6 @@ const zelda = (options = {}) => {
 		return true;
 	};
 
-	const spawnPackageManager = (args, cwd) => {
-		const command = options.packageManager;
-
-		log.simulation(simulationVerbosity)(`$ cd ${cwd} && ${command} ${args}`);
-
-		return options.simulate ? { status: 1 } : childProcess.spawnSync(command, args, { cwd: cwd, stdio: 'inherit' });
-	};
-
 	const logArray = (verbosity, label, array) => {
 		log.array(verbosity)(`\n[[${label}]]\n ┣ ${array.join('\n ┣ ')}\n`);
 	};
@@ -83,7 +74,7 @@ const zelda = (options = {}) => {
 	if (!options.recursive && !options.reRun) log.info(`Using "${rootNodeModules}" to store links`);
 
 	let traversed = 0,
-		installedRemotePackages = 0,
+		missingRemotePackages = 0,
 		totalPreMappedPackages = 0,
 		foundPackageCount = 0,
 		createdSymlinks = 0,
@@ -107,12 +98,12 @@ const zelda = (options = {}) => {
 
 		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - Math.floor(time / 60) * 60}s`;
 
-		// zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Installed ${installedRemotePackages} packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${createdSymlinks} symlinks .. Cleaned ${cleanedReferences} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
+		// zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Found ${missingRemotePackages} missing packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${createdSymlinks} symlinks .. Cleaned ${cleanedReferences} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
 		log[options.simulate ? 'warn' : 'info'](options.reRun ? 1 : 0)(`${options.simulate ? '[simulate] ' : ''}Done${
 			options.recursive ? '' : ' with ' + targetPackageRoot
 		} Took ${time}
 Traversed ${traversed} folders
-Installed ${installedRemotePackages} remote packages
+Found ${missingRemotePackages} missing remote packages
 Utilized pre-mapped packages in ${totalPreMappedPackages} places
 Found ${foundPackageCount} local packages
 Created ${createdSymlinks} symlinks
@@ -122,7 +113,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 	const updateStats = stats => {
 		traversed += stats.traversed;
-		installedRemotePackages += stats.installedRemotePackages;
+		missingRemotePackages += stats.missingRemotePackages;
 		totalPreMappedPackages += stats.totalPreMappedPackages;
 		foundPackageCount += stats.foundPackageCount;
 		createdSymlinks += stats.createdSymlinks;
@@ -142,7 +133,6 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 	};
 
 	if (!options.reRun && options.preclean) removeFolder(rootNodeModules);
-	if (options.cleanInstall) removeFolder(targetNodeModules);
 
 	makeFolder(rootNodeModules);
 	makeFolder(targetNodeModules);
@@ -182,8 +172,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 			return [item, 1];
 		}),
 	);
-	const dependenciesToInstall = [],
-		foundPackages = {};
+	const foundPackages = {};
 
 	const findLocalCopy = packageName => {
 		log(3)(`Checking for local copy of "${packageName}"`);
@@ -219,23 +208,8 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 		if (findLocalCopy(name) || installedModules[name]) return;
 
-		++installedRemotePackages;
-
-		dependenciesToInstall.push(name);
+		++missingRemotePackages;
 	});
-
-	const dependenciesToInstallCount = dependenciesToInstall.length;
-
-	if (dependenciesToInstallCount) {
-		log.info(
-			`Installing ${dependenciesToInstallCount} remote package${
-				dependenciesToInstallCount > 1 ? 's' : ''
-			} for ${targetPackageRoot}`,
-		);
-		logArray(1, 'dependenciesToInstall', dependenciesToInstall);
-
-		spawnPackageManager(['i', '--silent', '--no-save'].concat(dependenciesToInstall), targetPackageRoot);
-	}
 
 	forEachNodeModule(targetPackageRoot, findLocalCopy);
 
@@ -290,7 +264,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 	return {
 		traversed,
-		installedRemotePackages,
+		missingRemotePackages,
 		totalPreMappedPackages,
 		foundPackageCount,
 		createdSymlinks,
