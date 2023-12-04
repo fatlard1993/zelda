@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 import argi from 'argi';
 import Log from 'log';
 
