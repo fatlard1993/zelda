@@ -212,7 +212,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 	const foundPackageNames = Object.keys(foundPackages);
 	foundPackageCount += foundPackageNames.length;
 
-	if (foundPackageCount) logArray(2, 'foundPackageNames', foundPackageNames);
+	if (foundPackageCount) logArray(0, 'foundPackageNames', foundPackageNames);
 
 	const symlinkedFileNames = [];
 
