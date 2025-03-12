@@ -1,39 +1,34 @@
+import { rm, mkdir } from 'node:fs/promises';
 import fs from 'fs';
 import path from 'path';
 
 import Log from 'log';
 import findRoot from 'find-root';
-import now from 'performance-now';
-import {
-	findPackage,
-	findPackageSourceFolders,
-	findProjectRoot,
-	forEachNodeModule,
-	forEachPackage,
-	fsUtil,
-} from './utils';
+import { findPackage, findPackageSourceFolders, findProjectRoot, forEachNodeModule, forEachPackage } from './utils';
 const log = new Log({ tag: 'zelda', methodMap: { array: 'info', simulation: 'warn' } });
 
-const zelda = (options = {}) => {
+const now = () => Bun.nanoseconds();
+
+const zelda = async (options = {}) => {
 	const simulationVerbosity = options.simulate ? 0 : 3;
 
-	const removeFolder = folder => {
+	const removeFolder = async folder => {
 		if (!fs.existsSync(folder)) return false;
 
 		// eslint-disable-next-line spellcheck/spell-checker
 		log.simulation(simulationVerbosity)(`$ rm -rf ${folder}`);
 
-		if (!options.simulate) fsUtil.rmPattern(folder, /.*/);
+		if (!options.simulate) await rm(folder, { recursive: true, force: true });
 
 		return true;
 	};
 
-	const makeFolder = folder => {
+	const makeFolder = async folder => {
 		if (fs.existsSync(folder)) return false;
 
 		log.simulation(simulationVerbosity)(`$ mkdir -p ${folder}`);
 
-		if (!options.simulate) fsUtil.mkdir(folder);
+		if (!options.simulate) await mkdir(folder, { recursive: true, force: true });
 
 		return true;
 	};
@@ -120,9 +115,9 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 		cleanedReferences += stats.cleanedReferences;
 	};
 
-	const reRun = newOptions => {
+	const reRun = async newOptions => {
 		updateStats(
-			zelda(
+			await zelda(
 				Object.assign(
 					options,
 					{ reRun: true, preclean: false, recursive: false, autoFolders: false, folder: searchFolders, projectRoot },
@@ -132,32 +127,31 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 		);
 	};
 
-	if (!options.reRun && options.preclean) removeFolder(rootNodeModules);
+	if (!options.reRun && options.preclean) await removeFolder(rootNodeModules);
 
-	makeFolder(rootNodeModules);
-	makeFolder(targetNodeModules);
+	await makeFolder(rootNodeModules);
+	await makeFolder(targetNodeModules);
 
 	if (Array.isArray(options.target)) {
-		options.target.forEach(name => {
-			reRun({ target: path.resolve(projectRoot, name) });
-		});
+		await Promise.all(options.target.map(async name => await reRun({ target: path.resolve(projectRoot, name) })));
 
 		return;
 	}
 
 	if (options.recursive) {
-		searchFolders.forEach(parentFolder => {
-			forEachPackage(parentFolder, name => {
-				++recursivelyRan;
+		await Promise.all(
+			searchFolders.map(async parentFolder => {
+				await forEachPackage(parentFolder, async name => {
+					++recursivelyRan;
 
-				reRun({ target: path.resolve(parentFolder, name) });
-			});
-		});
+					await reRun({ target: path.resolve(parentFolder, name) });
+				});
+			}),
+		);
 
 		return;
 	}
 
-	// eslint-disable-next-line unicorn/prefer-module
 	const targetPackageJSON = require(path.join(targetPackageRoot, 'package.json'));
 	const targetPackageDependencyNames = Object.keys(
 		Object.assign(targetPackageJSON.dependencies || {}, targetPackageJSON.devDependencies || {}) || {},
@@ -216,25 +210,27 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 	const symlinkedFileNames = [];
 
-	foundPackageNames.forEach(name => {
-		const foundPackageLocation = foundPackages[name];
+	await Promise.all(
+		foundPackageNames.map(async name => {
+			const foundPackageLocation = foundPackages[name];
 
-		++traversed;
+			++traversed;
 
-		const cleanedReference = removeFolder(path.join(targetNodeModules, name));
+			const cleanedReference = await removeFolder(path.join(targetNodeModules, name));
 
-		if (cleanedReference) ++cleanedReferences;
+			if (cleanedReference) ++cleanedReferences;
 
-		if (!fs.existsSync(path.join(rootNodeModules, name))) {
-			log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
+			if (!fs.existsSync(path.join(rootNodeModules, name))) {
+				log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
 
-			symlinkedFileNames.push(name);
+				symlinkedFileNames.push(name);
 
-			log.simulation(simulationVerbosity)(`cd ${rootNodeModules} && ln -s ${foundPackageLocation} ${name}`);
+				log.simulation(simulationVerbosity)(`cd ${rootNodeModules} && ln -s ${foundPackageLocation} ${name}`);
 
-			if (!options.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
-		}
-	});
+				if (!options.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
+			}
+		}),
+	);
 
 	createdSymlinks += symlinkedFileNames.length;
 

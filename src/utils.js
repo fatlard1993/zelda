@@ -5,67 +5,6 @@ import Log from 'log';
 
 const log = new Log({ tag: 'zelda' });
 
-export const fsUtil = {
-	mkdir: function (directory) {
-		if (!directory) return;
-
-		log(4)(`Creating directory: ${directory}`);
-
-		for (let x = directory.length - 2; x >= 0; --x) {
-			if (directory.charAt(x) === '/' || directory.charAt(x) === path.sep) {
-				fsUtil.mkdir(directory.slice(0, x));
-
-				break;
-			}
-		}
-
-		try {
-			fs.mkdirSync(directory);
-
-			log()(`Created directory: ${directory}`);
-		} catch (error) {
-			if (error.code !== 'EEXIST') return log.error()(directory, error);
-
-			log.warn(4)(`Can't make ${directory}, already exists`);
-		}
-	},
-
-	rm: function (filePath) {
-		log(1)(`Removing file: ${filePath}`);
-
-		try {
-			fs.unlinkSync(filePath);
-		} catch (error) {
-			if (error.code !== 'ENOENT') return log.error(error);
-
-			log.warn(1)(`Can't remove ${filePath}, doesn't exist`);
-		}
-	},
-	rmPattern: function (rootPath, pattern) {
-		fs.readdirSync(path.resolve(rootPath)).forEach(function (fileName) {
-			if (!pattern.test(fileName)) return;
-
-			const resolvedPath = path.resolve(rootPath, fileName);
-
-			fsUtil['rm' + (fs.lstatSync(resolvedPath).isDirectory() ? 'dir' : '')](resolvedPath);
-		});
-	},
-	rmdir: function (directory) {
-		if (!fs.existsSync(directory)) return;
-
-		log(1)(`Removing directory: ${directory}`);
-
-		fs.readdirSync(directory).forEach(function (file) {
-			const currentPath = directory + '/' + file;
-
-			if (fs.lstatSync(currentPath).isDirectory()) fsUtil.rmdir(currentPath);
-			else fs.unlinkSync(currentPath);
-		});
-
-		fs.rmdirSync(directory);
-	},
-};
-
 const getChildFolders = (parentFolder, options = {}) => {
 	options = { ...options, blacklist: {}, ignoreSymlinks: false };
 	try {

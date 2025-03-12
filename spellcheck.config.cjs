@@ -1,3 +1,4 @@
+/* eslint-disable spellcheck/spell-checker */
 module.exports = {
 	comments: true,
 	strings: true,
@@ -5,8 +6,12 @@ module.exports = {
 	templates: true,
 	lang: 'en_US',
 	skipWords: [
+		'fixup',
 		'ecma',
 		'compat',
+		'jsdoc',
+		'mjs',
+		'dom',
 		'eslintrc',
 		'multiline',
 		'builtins',
@@ -26,6 +31,7 @@ module.exports = {
 		'unlink',
 		'rmdir',
 		'sep',
+		'usr',
 	],
 	skipIfMatch: ['\\d+v[wh]'],
 	skipWordIfMatch: [],

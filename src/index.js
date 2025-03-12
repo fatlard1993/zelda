@@ -65,4 +65,4 @@ const log = new Log({ tag: 'zelda', color: true, verbosity: options.verbosity })
 
 log(2)('Options', options);
 
-zelda(options);
+await zelda(options);
