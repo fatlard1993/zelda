@@ -32,6 +32,7 @@ module.exports = {
 		'rmdir',
 		'sep',
 		'usr',
+		'preclean',
 	],
 	skipIfMatch: ['\\d+v[wh]'],
 	skipWordIfMatch: [],
