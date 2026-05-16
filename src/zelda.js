@@ -3,8 +3,22 @@ import fs from 'fs';
 import path from 'path';
 
 import Log from 'log';
-import findRoot from 'find-root';
 import { findPackage, findPackageSourceFolders, findProjectRoot, forEachNodeModule, forEachPackage } from './utils';
+
+const findRoot = start => {
+	let dir = path.resolve(start);
+
+	while (true) {
+		if (fs.existsSync(path.join(dir, 'package.json'))) return dir;
+
+		const parent = path.dirname(dir);
+
+		if (parent === dir) throw new Error('package.json not found in path');
+
+		dir = parent;
+	}
+};
+
 const log = new Log({ tag: 'zelda', methodMap: { array: 'info', simulation: 'warn' } });
 
 const now = () => Bun.nanoseconds();
@@ -28,7 +42,7 @@ const zelda = async (options = {}) => {
 
 		log.simulation(simulationVerbosity)(`$ mkdir -p ${folder}`);
 
-		if (!options.simulate) await mkdir(folder, { recursive: true, force: true });
+		if (!options.simulate) await mkdir(folder, { recursive: true });
 
 		return true;
 	};
@@ -68,20 +82,32 @@ const zelda = async (options = {}) => {
 	log.info(options.recursive ? 0 : 1)(`Targeting: ${options.recursive ? projectRoot : targetPackageRoot}`);
 	if (!options.recursive && !options.reRun) log.info(`Using "${rootNodeModules}" to store links`);
 
-	let traversed = 0,
+	let checkedPackages = 0,
 		missingRemotePackages = 0,
 		totalPreMappedPackages = 0,
 		foundPackageCount = 0,
 		createdSymlinks = 0,
 		cleanedReferences = 0,
 		recursivelyRan = 0;
+	const getStats = () => ({
+		checkedPackages,
+		missingRemotePackages,
+		totalPreMappedPackages,
+		foundPackageCount,
+		createdSymlinks,
+		cleanedReferences,
+	});
+
 	let searchFolders = [];
 
 	if (options.autoFolders) searchFolders = Object.keys(findPackageSourceFolders(projectRoot, options.autoFoldersDepth));
 	if (options.folder)
 		searchFolders = searchFolders.concat(Array.isArray(options.folder) ? options.folder : [options.folder]);
 
-	if (searchFolders.length === 0) return log.error(`No package source folders are configured`);
+	if (searchFolders.length === 0) {
+		log.error(`No package source folders are configured`);
+		return getStats();
+	}
 
 	if (!options.reRun) {
 		log.info(`Using ${searchFolders.length} folders to search for local packages`);
@@ -89,25 +115,28 @@ const zelda = async (options = {}) => {
 	}
 
 	const printStats = () => {
-		let time = (now() - start) / 1000;
+		let time = (now() - start) / 1_000_000_000;
 
-		time = time < 60 ? `${time}s` : `${Math.floor(time / 60)}m ${time - Math.floor(time / 60) * 60}s`;
+		time = time < 60 ? `${time.toFixed(2)}s` : `${Math.floor(time / 60)}m ${(time - Math.floor(time / 60) * 60).toFixed(2)}s`;
 
-		// zlog[opts.simulate ? 'warn' : 'info'](opts.reRun ? 1 : 0)(`${opts.simulate ? '[simulate] ' : ''}Done with ${targetPackageRoot} .. Traversed ${traversed} folders .. Found ${missingRemotePackages} missing packages .. Utilized pre-mapped packages in ${totalPreMappedPackages} places .. Found ${foundPackageCount} new local packages .. Created ${createdSymlinks} symlinks .. Cleaned ${cleanedReferences} references .. Recursively ran zelda for ${recursivelyRan} local packages .. Took ${time}`);
-		log[options.simulate ? 'simulate' : 'info'](`Done${
-			options.recursive ? '' : ' with ' + targetPackageRoot
-		} Took ${time}
-Traversed ${traversed} folders
-Found ${missingRemotePackages} missing remote packages
-Utilized pre-mapped packages in ${totalPreMappedPackages} places
-Found ${foundPackageCount} local packages
-Created ${createdSymlinks} symlinks
-Cleaned ${cleanedReferences} references
-${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local packages` : ''}`);
+		const verb = options.simulate ? 'Would create' : 'Created';
+		const lines = [
+			`Done${options.recursive ? '' : ` with ${targetPackageRoot}`}. Took ${time}`,
+			`Checked ${checkedPackages} packages`,
+			`${totalPreMappedPackages} already linked`,
+			`${missingRemotePackages} missing remote packages`,
+			`Found ${foundPackageCount} local packages`,
+			`${verb} ${createdSymlinks} symlinks`,
+			`Cleaned ${cleanedReferences} references`,
+		];
+
+		if (options.recursive) lines.push(`Recursively ran zelda for ${recursivelyRan} local packages`);
+
+		log[options.simulate ? 'simulate' : 'info'](lines.join('\n'));
 	};
 
 	const updateStats = stats => {
-		traversed += stats.traversed;
+		checkedPackages += stats.checkedPackages;
 		missingRemotePackages += stats.missingRemotePackages;
 		totalPreMappedPackages += stats.totalPreMappedPackages;
 		foundPackageCount += stats.foundPackageCount;
@@ -117,25 +146,29 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 	const reRun = async newOptions => {
 		updateStats(
-			await zelda(
-				Object.assign(
-					options,
-					{ reRun: true, preclean: false, recursive: false, autoFolders: false, folder: searchFolders, projectRoot },
-					newOptions,
-				),
-			),
+			await zelda({
+				...options,
+				reRun: true,
+				preclean: false,
+				recursive: false,
+				autoFolders: false,
+				folder: searchFolders,
+				projectRoot,
+				...newOptions,
+			}),
 		);
 	};
 
 	if (!options.reRun && options.preclean) await removeFolder(rootNodeModules);
 
 	await makeFolder(rootNodeModules);
-	await makeFolder(targetNodeModules);
+	if (targetNodeModules) await makeFolder(targetNodeModules);
 
 	if (Array.isArray(options.target)) {
 		await Promise.all(options.target.map(async name => await reRun({ target: path.resolve(projectRoot, name) })));
 
-		return;
+		printStats();
+		return getStats();
 	}
 
 	if (options.recursive) {
@@ -149,13 +182,22 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 			}),
 		);
 
-		return;
+		printStats();
+		return getStats();
 	}
 
-	const targetPackageJSON = require(path.join(targetPackageRoot, 'package.json'));
-	const targetPackageDependencyNames = Object.keys(
-		Object.assign(targetPackageJSON.dependencies || {}, targetPackageJSON.devDependencies || {}) || {},
-	);
+	let targetPackageJSON;
+
+	try {
+		targetPackageJSON = require(path.join(targetPackageRoot, 'package.json'));
+	} catch {
+		log.error(`Could not read package.json in ${targetPackageRoot}`);
+		return getStats();
+	}
+	const targetPackageDependencyNames = Object.keys({
+		...targetPackageJSON.dependencies,
+		...targetPackageJSON.devDependencies,
+	});
 	const preMappedPackageNames = fs.readdirSync(rootNodeModules);
 	const preMappedPackages = Object.fromEntries(
 		preMappedPackageNames.map(item => {
@@ -167,7 +209,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 	const findLocalCopy = packageName => {
 		log(3)(`Checking for local copy of "${packageName}"`);
 
-		++traversed;
+		++checkedPackages;
 
 		if (preMappedPackages[packageName]) return preMappedPackages[packageName];
 		if (foundPackages[packageName]) return foundPackages[packageName];
@@ -187,11 +229,19 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 		logArray(2, 'targetPackageDependencyNames', targetPackageDependencyNames);
 	if (!options.preclean) logArray(2, 'preMappedPackageNames', preMappedPackageNames);
 
-	const installedModules = Object.fromEntries(
-		fs.readdirSync(targetNodeModules).map(item => {
-			return [item, 1];
-		}),
-	);
+	const installedModules = {};
+
+	for (const item of fs.readdirSync(targetNodeModules)) {
+		if (item.startsWith('@')) {
+			const scopePath = path.join(targetNodeModules, item);
+
+			for (const child of fs.readdirSync(scopePath)) {
+				installedModules[`${item}/${child}`] = 1;
+			}
+		} else {
+			installedModules[item] = 1;
+		}
+	}
 
 	targetPackageDependencyNames.forEach(name => {
 		if (preMappedPackages[name]) return ++totalPreMappedPackages;
@@ -214,20 +264,22 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 		foundPackageNames.map(async name => {
 			const foundPackageLocation = foundPackages[name];
 
-			++traversed;
-
 			const cleanedReference = await removeFolder(path.join(targetNodeModules, name));
 
 			if (cleanedReference) ++cleanedReferences;
 
-			if (!fs.existsSync(path.join(rootNodeModules, name))) {
-				log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}`);
+			const symlinkPath = path.join(rootNodeModules, name);
+
+			if (!fs.existsSync(symlinkPath)) {
+				log.info(3)(`Linking local copy of "${name}" to "${rootNodeModules}"`);
 
 				symlinkedFileNames.push(name);
 
+				if (name.includes('/')) await makeFolder(path.dirname(symlinkPath));
+
 				log.simulation(simulationVerbosity)(`cd ${rootNodeModules} && ln -s ${foundPackageLocation} ${name}`);
 
-				if (!options.simulate) fs.symlinkSync(foundPackageLocation, path.join(rootNodeModules, name), 'dir');
+				if (!options.simulate) fs.symlinkSync(foundPackageLocation, symlinkPath, 'dir');
 			}
 		}),
 	);
@@ -238,14 +290,7 @@ ${options.recursive ? `Recursively ran zelda for ${recursivelyRan} local package
 
 	printStats();
 
-	return {
-		traversed,
-		missingRemotePackages,
-		totalPreMappedPackages,
-		foundPackageCount,
-		createdSymlinks,
-		cleanedReferences,
-	};
+	return getStats();
 };
 
 export default zelda;

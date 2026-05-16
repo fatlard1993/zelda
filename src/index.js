@@ -30,7 +30,6 @@ const argi = new Argi({
 		target: {
 			type: 'string',
 			description: '<folder> The target package folder(s)',
-			defaultValue: process.cwd(),
 			alias: 't',
 		},
 		autoFolders: {
@@ -70,4 +69,9 @@ const log = new Log({ tag: 'zelda', color: true, verbosity: options.verbosity })
 
 log(2)('Options', options);
 
-await zelda(options);
+try {
+	await zelda(options);
+} catch (error) {
+	log.error(error.message || error);
+	process.exit(1);
+}

@@ -6,7 +6,7 @@ import Log from 'log';
 const log = new Log({ tag: 'zelda' });
 
 const getChildFolders = (parentFolder, options = {}) => {
-	options = { ...options, blacklist: {}, ignoreSymlinks: false };
+	options = { blacklist: {}, ignoreSymlinks: false, ...options };
 	try {
 		return fs.readdirSync(parentFolder).filter(folder => {
 			const location = path.join(parentFolder, folder);
@@ -26,41 +26,56 @@ const getChildFolders = (parentFolder, options = {}) => {
 
 			return isDirectory;
 		});
-	} catch {
+	} catch (error) {
+		log(3)(error);
+
 		return [];
 	}
 };
 
-export const forEachNodeModule = (packagePath, callback) => {
-	const modulesPath = path.join(packagePath, 'node_modules');
+export const forEachNodeModule = (parentPath, callback) => {
+	const modulesPath = path.join(parentPath, 'node_modules');
 
 	if (!fs.existsSync(modulesPath)) return;
 
 	const modules = getChildFolders(modulesPath, { blacklist: { '.bin': 1 } });
 
-	modules.forEach(packageName => {
-		const packagePath = path.join(modulesPath, packageName);
+	modules.forEach(name => {
+		const modulePath = path.join(modulesPath, name);
 
-		callback(packageName, packagePath);
+		if (name.startsWith('@')) {
+			const scopedPackages = getChildFolders(modulePath);
 
-		forEachNodeModule(packagePath, callback);
+			scopedPackages.forEach(scopedName => {
+				const scopedPath = path.join(modulePath, scopedName);
+				const fullName = `${name}/${scopedName}`;
+
+				callback(fullName, scopedPath);
+
+				forEachNodeModule(scopedPath, callback);
+			});
+		} else {
+			callback(name, modulePath);
+
+			forEachNodeModule(modulePath, callback);
+		}
 	});
 };
 
-export const forEachPackage = (parentFolder, callback) => {
+export const forEachPackage = async (parentFolder, callback) => {
 	if (!fs.existsSync(parentFolder)) return;
 
 	const packages = getChildFolders(parentFolder, { blacklist: { '.bin': 1 } });
 
-	packages.forEach(packageName => {
-		const packagePath = path.join(parentFolder, packageName);
+	for (const packageName of packages) {
+		const childPath = path.join(parentFolder, packageName);
 
-		if (!fs.existsSync(path.join(packagePath, 'package.json'))) return;
+		if (!fs.existsSync(path.join(childPath, 'package.json'))) continue;
 
-		callback(packageName, packagePath);
+		await callback(packageName, childPath);
 
-		forEachPackage(packagePath, callback);
-	});
+		await forEachPackage(childPath, callback);
+	}
 };
 
 const folderContainsPackages = parentFolder => {
@@ -73,7 +88,7 @@ const folderContainsPackages = parentFolder => {
 	for (let x = 0, count = folders.length, folder; x < count; ++x) {
 		folder = folders[x];
 
-		if (folder[0] !== '.' && !fs.existsSync(path.join(parentFolder, folder, 'package.json'))) continue;
+		if (folder[0] === '.' || !fs.existsSync(path.join(parentFolder, folder, 'package.json'))) continue;
 
 		result = true;
 
@@ -84,7 +99,12 @@ const folderContainsPackages = parentFolder => {
 };
 
 export const findProjectRoot = targetFolder => {
-	if (targetFolder === os.homedir()) return log.error(`Could not find a project root folder above ${targetFolder}`);
+	const root = path.parse(targetFolder).root;
+
+	if (targetFolder === root || targetFolder === os.homedir()) {
+		log.error(`Could not find a project root folder above ${targetFolder}`);
+		return undefined;
+	}
 
 	let projectRoot;
 	const parentFolder = path.resolve(targetFolder, '..');
